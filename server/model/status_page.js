@@ -486,6 +486,36 @@ class StatusPage extends BeanModel {
             return [];
         }
     }
+
+    /**
+     * 检查用户是否是状态页的所有者
+     * @param {number} userID 用户ID
+     * @returns {boolean} 是否是所有者
+     */
+    isOwner(userID) {
+        return this.user_id === userID;
+    }
+
+    /**
+     * 设置状态页的所有者
+     * @param {number} userID 用户ID
+     * @returns {Promise<void>}
+     */
+    async setOwner(userID) {
+        this.user_id = userID;
+        await R.store(this);
+    }
+
+    /**
+     * 获取状态页的所有者
+     * @returns {Promise<object|null>} 所有者用户对象
+     */
+    async getOwner() {
+        if (!this.user_id) {
+            return null;
+        }
+        return await R.findOne("user", " id = ? ", [this.user_id]);
+    }
 }
 
 module.exports = StatusPage;

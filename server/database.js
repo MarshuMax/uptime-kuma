@@ -342,6 +342,84 @@ class Database {
         } else if (dbConfig.type.endsWith("mariadb")) {
             await this.initMariaDB();
         }
+
+        // For debug only
+        // await R.debug(true);
+
+        // Create tables
+        await R.exec("CREATE TABLE IF NOT EXISTS user (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT, role TEXT DEFAULT 'admin', active INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS key_value (id INTEGER PRIMARY KEY AUTOINCREMENT, `key` TEXT, value TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS api_key (id INTEGER PRIMARY KEY AUTOINCREMENT, `key` TEXT, user_id INTEGER, name TEXT, created_date TEXT, active BOOLEAN DEFAULT 1, expires DATETIME)");
+        await R.exec("CREATE TABLE IF NOT EXISTS groups (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS heartbeat (id INTEGER PRIMARY KEY AUTOINCREMENT, monitor_id INTEGER, time TEXT, status INTEGER, ping REAL, important INTEGER, msg TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS incident (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, content TEXT, style TEXT, created_date TEXT, last_updated_date TEXT, pin INTEGER, active INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS maintenance (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, description TEXT, start_date TEXT, end_date TEXT, created_date TEXT, strategy TEXT, active INTEGER, domains TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS monitor (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER DEFAULT 1, name TEXT, type TEXT, url TEXT, method TEXT, body TEXT, headers TEXT, auth_username TEXT, auth_password TEXT, basic_auth_user TEXT, basic_auth_pass TEXT, oauth_client_id TEXT, oauth_client_secret TEXT, oauth_token_url TEXT, oauth_scopes TEXT, oauth_auth_method TEXT, json_path TEXT, json_path_operator TEXT, expected_value TEXT, conditions TEXT DEFAULT '[]', retryInterval INTEGER, interval INTEGER, timeout INTEGER, hostname TEXT, port INTEGER, maxretries INTEGER, weight INTEGER, keyword TEXT, invertKeyword INTEGER, httpBodyEncoding TEXT, maxredirects INTEGER, accepted_statuscodes TEXT, dns_resolve_type TEXT, dns_resolve_server TEXT, dns_last_result TEXT, pushToken TEXT, docker_container TEXT, docker_host INTEGER, proxyId INTEGER, notify_after INTEGER DEFAULT 0, notify_recovery INTEGER DEFAULT 0, resendInterval INTEGER DEFAULT 0, mqttUsername TEXT, mqttPassword TEXT, mqttTopic TEXT, mqttSuccessMessage TEXT, mqttCheckType TEXT, databaseConnectionString TEXT, databaseQuery TEXT, authMethod TEXT, authWorkstation TEXT, authDomain TEXT, grpcUrl TEXT, grpcMethod TEXT, grpcServiceName TEXT, grpcProtobuf TEXT, grpcBody TEXT, grpcMetadata TEXT, grpcEnableTls INTEGER, radiusUsername TEXT, radiusPassword TEXT, radiusCalledStationId TEXT, radiusCallingStationId TEXT, radiusSecret TEXT, parent INTEGER, game TEXT, gamedigGivenPortOnly INTEGER, httpMethod TEXT, tlsCa TEXT, tlsCert TEXT, tlsKey TEXT, upsideDown INTEGER, packetSize INTEGER DEFAULT 56, kafkaProducerBrokers TEXT DEFAULT '[]', kafkaProducerTopic TEXT, kafkaProducerSaslOptions TEXT DEFAULT '{}', kafkaProducerSsl INTEGER, kafkaProducerAllowAutoTopicCreation INTEGER, kafkaProducerMessage TEXT, chakraEndpoint TEXT, chakraId TEXT, chakraSecret TEXT, snmpOid TEXT, snmpVersion TEXT, rabbitmqUsername TEXT, rabbitmqPassword TEXT, rabbitmqNodes TEXT DEFAULT '[]', remote_browser INTEGER, cacheBust INTEGER, expiryNotification INTEGER, pushTitle TEXT, remote_database INTEGER )");
+        await R.exec("CREATE TABLE IF NOT EXISTS monitor_group (id INTEGER PRIMARY KEY AUTOINCREMENT, monitor_id INTEGER, group_id INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS monitor_maintenance (id INTEGER PRIMARY KEY AUTOINCREMENT, monitor_id INTEGER, maintenance_id INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS monitor_tag (id INTEGER PRIMARY KEY AUTOINCREMENT, monitor_id INTEGER, tag_id INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS monitor_tls_info (id INTEGER PRIMARY KEY AUTOINCREMENT, monitor_id INTEGER, info TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS notification (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, config TEXT, isDefault INTEGER, active INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS notification_sent (id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT, monitor_id INTEGER, notification_id INTEGER, status INTEGER, time TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS proxy (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, `default` INTEGER, active INTEGER, host TEXT, port INTEGER, auth INTEGER, username TEXT, password TEXT, protocol TEXT, created_date TEXT, monitors TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS settings_to_notification (id INTEGER PRIMARY KEY AUTOINCREMENT, settings_id INTEGER, notification_id INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS stat_data (id INTEGER PRIMARY KEY, monitor_id INTEGER, data TEXT, time INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS status_page (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER DEFAULT 1, slug TEXT, title TEXT, description TEXT, icon TEXT, theme TEXT, published INTEGER, search_engine_index INTEGER, show_tags INTEGER DEFAULT 0, password TEXT, googleAnalyticsId TEXT, customCSS TEXT, footerText TEXT, showPoweredBy INTEGER DEFAULT 1, showCertificateExpiry INTEGER DEFAULT 1, domainNameList TEXT, googleAnalyticsTagId TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS status_page_cname (id INTEGER PRIMARY KEY AUTOINCREMENT, domain_name TEXT, status_page_id INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS status_page_maintenance (id INTEGER PRIMARY KEY AUTOINCREMENT, status_page_id INTEGER, maintenance_id INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS status_page_to_monitor (id INTEGER PRIMARY KEY AUTOINCREMENT, status_page_id INTEGER, monitor_id INTEGER)");
+        await R.exec("CREATE TABLE IF NOT EXISTS tag (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, color TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS docker_host (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, name TEXT, docker_daemon TEXT, docker_type TEXT, docker_api_version TEXT);");
+        await R.exec("CREATE TABLE IF NOT EXISTS remote_browser (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, active BOOLEAN DEFAULT 1, url TEXT)");
+        await R.exec("CREATE TABLE IF NOT EXISTS twofa (id INTEGER PRIMARY KEY AUTOINCREMENT, token TEXT)");
+
+        // Add special column for sqlite only
+        // Only MySQL & MariaDB support ON UPDATE CURRENT_TIMESTAMP
+        if (this.dbConfig.type === "sqlite") {
+            await R.exec("PRAGMA foreign_keys=OFF;");
+
+            try {
+                let pragmaForeignKeys = await R.getCell("PRAGMA foreign_keys");
+                if (pragmaForeignKeys === 0) {
+                    console.log("Foreign Keys is Off in SQLite. This is not normal.");
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        try {
+            await R.exec("SELECT role FROM user LIMIT 1");
+        } catch (e) {
+            // 为user表添加role字段
+            console.log("正在为user表添加role字段");
+            await R.exec("ALTER TABLE user ADD COLUMN role TEXT DEFAULT 'admin'");
+        }
+
+        // 检查monitor表是否有user_id字段
+        try {
+            await R.exec("SELECT user_id FROM monitor LIMIT 1");
+        } catch (e) {
+            // 为monitor表添加user_id字段
+            console.log("正在为monitor表添加user_id字段");
+            await R.exec("ALTER TABLE monitor ADD COLUMN user_id INTEGER DEFAULT 1");
+        }
+
+        // 检查status_page表是否有user_id字段
+        try {
+            await R.exec("SELECT user_id FROM status_page LIMIT 1");
+        } catch (e) {
+            // 为status_page表添加user_id字段
+            console.log("正在为status_page表添加user_id字段");
+            await R.exec("ALTER TABLE status_page ADD COLUMN user_id INTEGER DEFAULT 1");
+        }
+
+        this.monitorNotificationDao = {
+            // 提供一个空对象以避免"不能调用未定义对象的方法"错误
+        };
+        this.heartbeatDao = {
+            // 提供一个空对象以避免"不能调用未定义对象的方法"错误
+        };
     }
 
     /**
@@ -371,6 +449,23 @@ class Database {
             log.debug("db", await R.getAll("PRAGMA journal_mode"));
             log.debug("db", await R.getAll("PRAGMA cache_size"));
             log.debug("db", "SQLite Version: " + await R.getCell("SELECT sqlite_version()"));
+        }
+    }
+
+    /**
+     * 检查特定列是否存在于表中（SQLite适用）
+     * @param {string} table 表名
+     * @param {string} column 列名
+     * @returns {Promise<boolean>} 列是否存在
+     */
+    static async checkColumnExists(table, column) {
+        try {
+            // 正确的SQLite语法，使用PRAGMA table_info来查询表结构
+            const result = await R.getAll(`PRAGMA table_info(${table})`);
+            return result.some(row => row.name === column);
+        } catch (e) {
+            log.error("db", `检查列是否存在时出错: ${e.message}`);
+            return false;
         }
     }
 
@@ -433,6 +528,48 @@ class Database {
                 throw e;
             }
         }
+
+        // 添加用户角色和监控项所有者字段
+        try {
+            // 检查user表是否存在role字段
+            let hasRoleColumn = await this.checkColumnExists("user", "role");
+            
+            if (!hasRoleColumn) {
+                log.info("db", "添加用户角色字段");
+                await R.exec("ALTER TABLE user ADD COLUMN role TEXT DEFAULT 'admin'");
+            } else {
+                log.info("db", "用户角色字段已存在，跳过添加");
+            }
+
+            // 检查monitor表是否存在user_id字段
+            let hasMonitorUserIdColumn = await this.checkColumnExists("monitor", "user_id");
+            
+            if (!hasMonitorUserIdColumn) {
+                log.info("db", "添加监控项所有者字段");
+                await R.exec("ALTER TABLE monitor ADD COLUMN user_id INTEGER DEFAULT 1");
+            } else {
+                log.info("db", "监控项所有者字段已存在，跳过添加");
+            }
+
+            // 检查status_page表是否存在user_id字段
+            let hasStatusPageUserIdColumn = await this.checkColumnExists("status_page", "user_id");
+            
+            if (!hasStatusPageUserIdColumn) {
+                log.info("db", "添加状态页所有者字段");
+                await R.exec("ALTER TABLE status_page ADD COLUMN user_id INTEGER DEFAULT 1");
+            } else {
+                log.info("db", "状态页所有者字段已存在，跳过添加");
+            }
+        } catch (e) {
+            log.error("db", "添加多用户字段失败: " + e.message);
+        }
+        
+        this.monitorNotificationDao = {
+            // 提供一个空对象以避免"不能调用未定义对象的方法"错误
+        };
+        this.heartbeatDao = {
+            // 提供一个空对象以避免"不能调用未定义对象的方法"错误
+        };
     }
 
     /**

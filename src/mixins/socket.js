@@ -34,6 +34,8 @@ export default {
                 initedSocketIO: false,
             },
             username: null,
+            userID: null,
+            userRole: null,
             remember: (localStorage.remember !== "0"),
             allowLoginDialog: false,        // Allowed to show login dialog, but "loggedIn" have to be true too. This exists because prevent the login dialog show 0.1s in first before the socket server auth-ed.
             loggedIn: false,
@@ -291,6 +293,19 @@ export default {
 
             socket.on("refresh", () => {
                 location.reload();
+            });
+
+            socket.on("loginSuccess", (userData) => {
+                this.loggedIn = true;
+                this.username = userData.username;
+                this.userID = userData.id;
+                this.userRole = userData.role;
+                this.allowLoginDialog = false;
+
+                if (this.remember) {
+                    this.storage().token = userData.token;
+                    this.socket.token = userData.token;
+                }
             });
         },
         /**
@@ -709,7 +724,23 @@ export default {
          */
         getMonitorChartData(monitorID, period, callback) {
             socket.emit("getMonitorChartData", monitorID, period, callback);
-        }
+        },
+
+        /**
+         * Register a new account
+         * @param {string} username Username to register
+         * @param {string} password Password to use
+         * @param {function} callback Callback to handle response
+         * @returns {void}
+         */
+        register(username, password, callback) {
+            socket.emit("register", {
+                username,
+                password,
+            }, (res) => {
+                callback(res);
+            });
+        },
     },
 
     computed: {

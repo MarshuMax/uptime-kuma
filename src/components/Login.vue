@@ -21,7 +21,12 @@
                     </div>
                 </div>
 
-                <div class="form-check mb-3 mt-3 d-flex justify-content-center pe-4">
+                <div v-if="!tokenRequired && isRegisterMode" class="form-floating mt-3">
+                    <input id="confirmPassword" v-model="confirmPassword" type="password" class="form-control" placeholder="Confirm Password" autocomplete="new-password" required>
+                    <label for="confirmPassword">{{ $t("Confirm Password") }}</label>
+                </div>
+
+                <div v-if="!isRegisterMode" class="form-check mb-3 mt-3 d-flex justify-content-center pe-4">
                     <div class="form-check">
                         <input id="remember" v-model="$root.remember" type="checkbox" value="remember-me" class="form-check-input">
 
@@ -31,11 +36,15 @@
                     </div>
                 </div>
                 <button class="w-100 btn btn-primary" type="submit" :disabled="processing">
-                    {{ $t("Login") }}
+                    {{ isRegisterMode ? $t("Register") : $t("Login") }}
                 </button>
 
                 <div v-if="res && !res.ok" class="alert alert-danger mt-3" role="alert">
                     {{ $t(res.msg) }}
+                </div>
+                
+                <div class="mt-3 text-center">
+                    <a href="#" @click.prevent="toggleMode">{{ isRegisterMode ? $t("Already have an account? Login") : $t("Create a new account") }}</a>
                 </div>
             </form>
         </div>
@@ -49,9 +58,11 @@ export default {
             processing: false,
             username: "",
             password: "",
+            confirmPassword: "",
             token: "",
             res: null,
             tokenRequired: false,
+            isRegisterMode: false,
         };
     },
 
@@ -71,16 +82,51 @@ export default {
         submit() {
             this.processing = true;
 
-            this.$root.login(this.username, this.password, this.token, (res) => {
-                this.processing = false;
-
-                if (res.tokenRequired) {
-                    this.tokenRequired = true;
-                } else {
-                    this.res = res;
+            if (this.isRegisterMode) {
+                if (this.password !== this.confirmPassword) {
+                    this.res = {
+                        ok: false,
+                        msg: "Passwords do not match"
+                    };
+                    this.processing = false;
+                    return;
                 }
-            });
+
+                this.$root.register(this.username, this.password, (res) => {
+                    this.processing = false;
+                    this.res = res;
+                    
+                    if (res.ok) {
+                        this.isRegisterMode = false;
+                        this.confirmPassword = "";
+                        this.res = {
+                            ok: true,
+                            msg: "Register successful, please login"
+                        };
+                    }
+                });
+            } else {
+                this.$root.login(this.username, this.password, this.token, (res) => {
+                    this.processing = false;
+
+                    if (res.tokenRequired) {
+                        this.tokenRequired = true;
+                    } else {
+                        this.res = res;
+                    }
+                });
+            }
         },
+
+        /**
+         * Toggle between login and register mode
+         * @returns {void}
+         */
+        toggleMode() {
+            this.isRegisterMode = !this.isRegisterMode;
+            this.res = null;
+            this.confirmPassword = "";
+        }
     },
 };
 </script>

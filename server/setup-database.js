@@ -6,6 +6,7 @@ const path = require("path");
 const Database = require("./database");
 const { allowDevAllOrigin } = require("./util-server");
 const mysql = require("mysql2/promise");
+const { R } = require("redbean-node");
 
 /**
  *  A standalone express app that is used to setup a database
@@ -104,7 +105,7 @@ class SetupDatabase {
      * @param {number} port where the server is listening
      * @returns {Promise<void>}
      */
-    start(hostname, port) {
+    async start(hostname, port) {
         return new Promise((resolve) => {
             const app = express();
             let tempServer;

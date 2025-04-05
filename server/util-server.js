@@ -707,48 +707,56 @@ exports.checkStatusCode = function (status, acceptedCodes) {
  * @returns {number} Total clients in room
  */
 exports.getTotalClientInRoom = (io, roomName) => {
+    try {
+        if (!io || !roomName) {
+            return 0;
+        }
 
-    const sockets = io.sockets;
+        const sockets = io.sockets;
 
-    if (!sockets) {
-        return 0;
-    }
+        if (!sockets) {
+            return 0;
+        }
 
-    const adapter = sockets.adapter;
+        const adapter = sockets.adapter;
 
-    if (!adapter) {
-        return 0;
-    }
+        if (!adapter || !adapter.rooms) {
+            return 0;
+        }
 
-    const room = adapter.rooms.get(roomName);
+        const room = adapter.rooms.get(roomName);
 
-    if (room) {
-        return room.size;
-    } else {
+        if (room) {
+            return room.size;
+        } else {
+            return 0;
+        }
+    } catch (error) {
+        console.error("Error in getTotalClientInRoom:", error);
         return 0;
     }
 };
 
 /**
- * Allow CORS all origins if development
- * @param {object} res Response object from axios
+ * Allow CORS access for development
+ * @param {object} res Express response object
  * @returns {void}
  */
 exports.allowDevAllOrigin = (res) => {
-    if (process.env.NODE_ENV === "development") {
-        exports.allowAllOrigin(res);
-    }
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
 };
 
 /**
- * Allow CORS all origins
- * @param {object} res Response object from axios
+ * Allow CORS access for all origins
+ * @param {object} res Express response object
  * @returns {void}
  */
 exports.allowAllOrigin = (res) => {
     res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
 };
 
 /**
@@ -1048,17 +1056,80 @@ module.exports.axiosAbortSignal = (timeoutMs) => {
         if (!timeoutMs || timeoutMs <= 0) {
             timeoutMs = 5000;
         }
-        return AbortSignal.timeout(timeoutMs);
-    } catch (_) {
-        // v16-: AbortSignal.timeout is not supported
-        try {
+        
+        if (typeof AbortSignal.timeout === 'function') {
+            return AbortSignal.timeout(timeoutMs);
+        } else {
+            // v16-: AbortSignal.timeout is not supported
             const abortController = new AbortController();
             setTimeout(() => abortController.abort(), timeoutMs);
-
             return abortController.signal;
-        } catch (_) {
-            // v15-: AbortController is not supported
-            return null;
         }
+    } catch (error) {
+        console.error("Error creating abort signal:", error);
+        // v15-: AbortController is not supported
+        return null;
     }
 };
+
+/**
+ * 获取设置值，如果设置不存在则返回默认值
+ * @param {string} key 设置键名
+ * @param {any} defaultValue 默认值
+ * @returns {Promise<any>} 设置值或默认值
+ */
+const setting = async (key, defaultValue = null) => {
+    let value = await R.getCell("SELECT `value` FROM setting WHERE `key` = ? ", [
+        key,
+    ]);
+
+    if (value === null) {
+        return defaultValue;
+    }
+
+    try {
+        return JSON.parse(value);
+    } catch (e) {
+        return value;
+    }
+};
+
+/**
+ * 设置指定键的值
+ * @param {string} key 设置键名
+ * @param {any} value 要设置的值
+ * @param {string|null} type 设置类型
+ * @returns {Promise<void>}
+ */
+const setSetting = async (key, value, type = null) => {
+    let bean = await R.findOne("setting", " `key` = ? ", [
+        key,
+    ]);
+
+    if (!bean) {
+        bean = R.dispense("setting");
+        bean.key = key;
+    }
+
+    bean.type = type;
+    bean.value = JSON.stringify(value);
+    await R.store(bean);
+};
+
+/**
+ * Check if the user has logged in
+ * @param {Socket} socket Socket.io socket object
+ * @returns {void}
+ * @throws {Error} Not logged in
+ */
+function checkLogin(socket) {
+    if (!socket.userID) {
+        throw new Error("Not logged in");
+    }
+}
+
+/**
+ * 确保这些函数被正确导出
+ */
+module.exports.setting = setting;
+module.exports.setSetting = setSetting;

@@ -211,6 +211,42 @@
                 </div>
             </div>
 
+            <!-- Allow User Registration -->
+            <div class="mb-4">
+                <label class="form-label">
+                    {{ $t("User Registration") }}
+                </label>
+
+                <div class="form-check">
+                    <input
+                        id="allowRegisterYes"
+                        v-model="settings.allowRegister"
+                        class="form-check-input"
+                        type="radio"
+                        name="allowRegister"
+                        :value="true"
+                        required
+                    />
+                    <label class="form-check-label" for="allowRegisterYes">
+                        {{ $t("Allow new users to register") }}
+                    </label>
+                </div>
+                <div class="form-check">
+                    <input
+                        id="allowRegisterNo"
+                        v-model="settings.allowRegister"
+                        class="form-check-input"
+                        type="radio"
+                        name="allowRegister"
+                        :value="false"
+                        required
+                    />
+                    <label class="form-check-label" for="allowRegisterNo">
+                        {{ $t("Disable registration (only admin can create users)") }}
+                    </label>
+                </div>
+            </div>
+
             <!-- Save Button -->
             <div>
                 <button class="btn btn-primary" type="submit">

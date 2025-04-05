@@ -90,8 +90,20 @@ const Monitor = require("./model/monitor");
 const User = require("./model/user");
 
 log.debug("server", "Importing Settings");
-const { getSettings, setSettings, setting, initJWTSecret, checkLogin, doubleCheckPassword, shake256, SHAKE256_LENGTH, allowDevAllOrigin,
+const { 
+    shake256, 
+    SHAKE256_LENGTH,
+    getSettings, 
+    setSettings, 
+    setting, 
+    initJWTSecret, 
+    checkLogin, 
+    doubleCheckPassword, 
+    allowDevAllOrigin,
+    allowAllOrigin,
+    getTotalClientInRoom
 } = require("./util-server");
+const { Settings } = require("./settings");
 
 log.debug("server", "Importing Notification");
 const { Notification } = require("./notification");
@@ -144,7 +156,6 @@ const { dockerSocketHandler } = require("./socket-handlers/docker-socket-handler
 const { maintenanceSocketHandler } = require("./socket-handlers/maintenance-socket-handler");
 const { apiKeySocketHandler } = require("./socket-handlers/api-key-socket-handler");
 const { generalSocketHandler } = require("./socket-handlers/general-socket-handler");
-const { Settings } = require("./settings");
 const apicache = require("./modules/apicache");
 const { resetChrome } = require("./monitor-types/real-browser-monitor-type");
 const { EmbeddedMariaDB } = require("./embedded-mariadb");
@@ -365,6 +376,8 @@ let needSetup = false;
                     callback({
                         ok: true,
                     });
+                    
+                    // 发送用户信息已在afterLogin函数中完成
                 } else {
 
                     log.info("auth", `Inactive or deleted user ${decoded.username}. IP=${clientIP}`);
@@ -417,10 +430,14 @@ let needSetup = false;
 
                     log.info("auth", `Successfully logged in user ${data.username}. IP=${clientIP}`);
 
+                    const token = User.createJWT(user, server.jwtSecret);
+                    
                     callback({
                         ok: true,
-                        token: User.createJWT(user, server.jwtSecret),
+                        token: token,
                     });
+                    
+                    // 发送用户信息已在afterLogin函数中完成
                 }
 
                 if (user.twofa_status === 1 && !data.token) {
@@ -445,10 +462,14 @@ let needSetup = false;
 
                         log.info("auth", `Successfully logged in user ${data.username}. IP=${clientIP}`);
 
+                        const token = User.createJWT(user, server.jwtSecret);
+                        
                         callback({
                             ok: true,
-                            token: User.createJWT(user, server.jwtSecret),
+                            token: token,
                         });
+                        
+                        // 发送用户信息已在afterLogin函数中完成
                     } else {
 
                         log.warn("auth", `Invalid token provided for user ${data.username}. IP=${clientIP}`);
@@ -470,7 +491,62 @@ let needSetup = false;
                     msgi18n: true,
                 });
             }
+        });
 
+        socket.on("register", async (data, callback) => {
+            try {
+                // 检查是否允许注册（默认允许）
+                const allowRegister = await Settings.get("allowRegister", true);
+                if (!allowRegister) {
+                    return callback({
+                        ok: false,
+                        msg: "Registration is disabled",
+                    });
+                }
+
+                // 检查用户名和密码
+                if (!data.username || !data.password) {
+                    return callback({
+                        ok: false,
+                        msg: "Invalid username or password",
+                    });
+                }
+
+                // 检查用户名是否已存在
+                const existingUser = await R.findOne("user", " username = ? ", [
+                    data.username,
+                ]);
+
+                if (existingUser) {
+                    return callback({
+                        ok: false,
+                        msg: "Username already exists",
+                    });
+                }
+
+                // 创建新用户
+                const user = await User.create(data.username, data.password, "user");
+                
+                log.info("auth", `User registered: ${data.username}`);
+                
+                // 在注册成功后自动登录用户
+                await afterLogin(socket, user);
+                
+                // 创建JWT令牌
+                const token = User.createJWT(user, server.jwtSecret);
+                
+                callback({
+                    ok: true,
+                    msg: "User registered successfully",
+                    token: token,
+                });
+            } catch (error) {
+                log.error("auth", "Register error: " + error.message);
+                callback({
+                    ok: false,
+                    msg: "Registration failed: " + error.message,
+                });
+            }
         });
 
         socket.on("logout", async (callback) => {
@@ -721,12 +797,14 @@ let needSetup = false;
                 monitor.rabbitmqNodes = JSON.stringify(monitor.rabbitmqNodes);
 
                 bean.import(monitor);
+                
+                // 设置监控项创建者
                 bean.user_id = socket.userID;
 
                 bean.validate();
 
                 await R.store(bean);
-
+                
                 await updateMonitorNotification(bean.id, notificationIDList);
 
                 await server.sendUpdateMonitorIntoList(socket, bean.id);
@@ -758,10 +836,21 @@ let needSetup = false;
         // Edit a monitor
         socket.on("editMonitor", async (monitor, callback) => {
             try {
+                const monitorID = monitor.id;
+
+                // 检查权限
+                if (!await checkMonitorPermission(socket, monitorID)) {
+                    callback({
+                        ok: false,
+                        msg: "No permission to edit this monitor"
+                    });
+                    return;
+                }
+
                 let removeGroupChildren = false;
                 checkLogin(socket);
 
-                let bean = await R.findOne("monitor", " id = ? ", [ monitor.id ]);
+                let bean = await R.findOne("monitor", " id = ? ", [ monitorID ]);
 
                 if (bean.user_id !== socket.userID) {
                     throw new Error("Permission denied.");
@@ -1028,6 +1117,15 @@ let needSetup = false;
 
         socket.on("deleteMonitor", async (monitorID, callback) => {
             try {
+                // 检查权限
+                if (!await checkMonitorPermission(socket, monitorID)) {
+                    callback({
+                        ok: false,
+                        msg: "No permission to delete this monitor"
+                    });
+                    return;
+                }
+
                 checkLogin(socket);
 
                 log.info("manage", `Delete Monitor: ${monitorID} User ID: ${socket.userID}`);
@@ -1674,6 +1772,14 @@ async function afterLogin(socket, user) {
     socket.userID = user.id;
     socket.join(user.id);
 
+    // 发送登录成功事件和用户数据
+    socket.emit("loginSuccess", {
+        token: socket.handshake.auth?.token,
+        username: user.username,
+        id: user.id,
+        role: user.role || "admin"  // 默认为admin
+    });
+
     let monitorList = await server.sendMonitorList(socket);
     await Promise.allSettled([
         sendInfo(socket),
@@ -1737,6 +1843,13 @@ async function initDatabase(testMode = false) {
     }
 
     server.jwtSecret = jwtSecretBean.value;
+    
+    // 设置允许注册标志位 - 默认为true
+    try {
+        await Settings.set("allowRegister", true);
+    } catch (error) {
+        log.error("server", "设置allowRegister失败: " + error.message);
+    }
 }
 
 /**
@@ -1875,3 +1988,59 @@ let unexpectedErrorHandler = (error, promise) => {
 };
 process.addListener("unhandledRejection", unexpectedErrorHandler);
 process.addListener("uncaughtException", unexpectedErrorHandler);
+
+/**
+ * 检查用户是否有权限操作指定的监控项
+ * @param {Socket} socket Socket.io客户端连接
+ * @param {number} monitorID 监控项ID
+ * @returns {Promise<boolean>} 是否有权限
+ */
+async function checkMonitorPermission(socket, monitorID) {
+    if (!socket.userID) {
+        return false;
+    }
+
+    // 获取用户和监控项信息
+    const user = await R.findOne("user", " id = ? ", [socket.userID]);
+    const monitor = await R.findOne("monitor", " id = ? ", [monitorID]);
+
+    if (!monitor) {
+        return false;
+    }
+
+    // 管理员有所有权限
+    if (user && user.role === "admin") {
+        return true;
+    }
+
+    // 检查是否是监控项的所有者
+    return monitor.user_id === socket.userID;
+}
+
+/**
+ * 检查用户是否有权限操作指定的状态页
+ * @param {Socket} socket Socket.io客户端连接
+ * @param {number} statusPageID 状态页ID
+ * @returns {Promise<boolean>} 是否有权限
+ */
+async function checkStatusPagePermission(socket, statusPageID) {
+    if (!socket.userID) {
+        return false;
+    }
+
+    // 获取用户和状态页信息
+    const user = await R.findOne("user", " id = ? ", [socket.userID]);
+    const statusPage = await R.findOne("status_page", " id = ? ", [statusPageID]);
+
+    if (!statusPage) {
+        return false;
+    }
+
+    // 管理员有所有权限
+    if (user && user.role === "admin") {
+        return true;
+    }
+
+    // 检查是否是状态页的所有者
+    return statusPage.user_id === socket.userID;
+}

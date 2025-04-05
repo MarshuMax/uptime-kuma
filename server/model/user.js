@@ -44,10 +44,44 @@ class User extends BeanModel {
     static createJWT(user, jwtSecret) {
         return jwt.sign({
             username: user.username,
+            role: user.role || "admin",
             h: shake256(user.password, SHAKE256_LENGTH),
         }, jwtSecret);
     }
 
+    /**
+     * 检查用户是否有管理员角色
+     * @returns {boolean} 是否是管理员
+     */
+    isAdmin() {
+        return this.role === "admin";
+    }
+
+    /**
+     * 检查用户是否是普通用户
+     * @returns {boolean} 是否是普通用户
+     */
+    isUser() {
+        return this.role === "user";
+    }
+
+    /**
+     * 创建新用户
+     * @param {string} username 用户名
+     * @param {string} password 密码
+     * @param {string} role 角色，默认为user
+     * @returns {Promise<User>} 新创建的用户对象
+     */
+    static async create(username, password, role = "user") {
+        const user = R.dispense("user");
+        user.username = username;
+        user.password = passwordHash.generate(password);
+        user.role = role;
+        user.active = 1;
+        
+        await R.store(user);
+        return user;
+    }
 }
 
 module.exports = User;

@@ -37,6 +37,16 @@
                     </div>
                 </div>
             </router-link>
+
+            <!-- 添加编辑和删除按钮 -->
+            <div v-if="!isSelectMode" class="action-buttons">
+                <router-link v-if="canEdit()" :to="'/edit/' + monitor.id" class="btn btn-sm btn-outline-secondary me-1">
+                    <font-awesome-icon icon="edit" />
+                </router-link>
+                <button v-if="canDelete()" class="btn btn-sm btn-outline-danger" @click="confirmDelete(monitor)">
+                    <font-awesome-icon icon="trash" />
+                </button>
+            </div>
         </div>
 
         <transition name="slide-fade-up">
@@ -55,6 +65,25 @@
                 />
             </div>
         </transition>
+
+        <!-- 确认删除对话框 -->
+        <div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="deleteConfirmModalLabel">{{ $t("Delete Monitor") }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        {{ $t("deleteMonitorMsg") }}
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{{ $t("Cancel") }}</button>
+                        <button type="button" class="btn btn-danger" @click="deleteMonitor">{{ $t("Delete") }}</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -63,6 +92,7 @@ import HeartbeatBar from "../components/HeartbeatBar.vue";
 import Tag from "../components/Tag.vue";
 import Uptime from "../components/Uptime.vue";
 import { getMonitorRelativeURL } from "../util.ts";
+import { Modal } from "bootstrap";
 
 export default {
     name: "MonitorListItem",
@@ -116,6 +146,8 @@ export default {
     data() {
         return {
             isCollapsed: true,
+            monitorToDelete: null,
+            deleteModal: null,
         };
     },
     computed: {
@@ -147,6 +179,9 @@ export default {
             // this.$refs.heartbeatBar.resize();
         }
     },
+    mounted() {
+        this.deleteModal = new Modal(document.getElementById('deleteConfirmModal'));
+    },
     beforeMount() {
 
         // Always unfold if monitor is accessed directly
@@ -169,6 +204,60 @@ export default {
         this.isCollapsed = storageObject[`monitor_${this.monitor.id}`];
     },
     methods: {
+        /**
+         * 检查当前用户是否能编辑监控项
+         * @returns {boolean} 是否可以编辑
+         */
+        canEdit() {
+            // 管理员可以编辑所有监控项
+            if (this.$root.userRole === "admin") {
+                return true;
+            }
+            
+            // 非管理员只能编辑自己创建的监控项
+            return this.monitor.user_id === this.$root.userID;
+        },
+
+        /**
+         * 检查当前用户是否能删除监控项
+         * @returns {boolean} 是否可以删除
+         */
+        canDelete() {
+            // 管理员可以删除所有监控项
+            if (this.$root.userRole === "admin") {
+                return true;
+            }
+            
+            // 非管理员只能删除自己创建的监控项
+            return this.monitor.user_id === this.$root.userID;
+        },
+
+        /**
+         * 确认删除监控项
+         * @param {Object} monitor 要删除的监控项
+         */
+        confirmDelete(monitor) {
+            this.monitorToDelete = monitor;
+            this.deleteModal.show();
+        },
+
+        /**
+         * 删除监控项
+         */
+        deleteMonitor() {
+            if (this.monitorToDelete) {
+                this.$root.getSocket().emit("deleteMonitor", this.monitorToDelete.id, (res) => {
+                    if (res.ok) {
+                        this.$root.toastSuccess(this.$t("Deleted Successfully"));
+                    } else {
+                        this.$root.toastError(res.msg);
+                    }
+                });
+                this.deleteModal.hide();
+                this.monitorToDelete = null;
+            }
+        },
+
         /**
          * Changes the collapsed value of the current monitor and saves
          * it to local storage
@@ -253,4 +342,41 @@ export default {
     z-index: 15;
 }
 
+.item {
+    display: flex;
+    flex-direction: column;
+    padding: 7px 14px 7px 0;
+    flex-grow: 1;
+    text-decoration: none;
+    color: var(--color-font);
+
+    &.disabled {
+        opacity: 0.6;
+    }
+}
+
+.row {
+    width: 100%;
+}
+
+.info {
+    display: flex;
+    align-items: center;
+}
+
+.monitor-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.bottom-style {
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.action-buttons {
+    display: flex;
+    align-items: center;
+    margin-right: 10px;
+}
 </style>
