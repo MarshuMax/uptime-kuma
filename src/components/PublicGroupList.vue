@@ -1,13 +1,39 @@
 <template>
     <!-- Group List -->
     <Draggable
+        v-if="$root && $root.publicGroupList"
         v-model="$root.publicGroupList"
         :disabled="!editMode"
         item-key="id"
         :animation="100"
     >
+        <!-- 全局搜索框 -->
+        <div v-if="hasMonitors && !editMode" class="global-search-container mb-4">
+            <div class="input-group">
+                <input 
+                    type="text" 
+                    class="form-control" 
+                    v-model="globalSearchKeyword" 
+                    :placeholder="$t('Search across all monitors...')" 
+                    aria-label="Global search"
+                >
+                <button 
+                    v-if="globalSearchKeyword" 
+                    class="btn btn-outline-secondary" 
+                    type="button" 
+                    @click="clearGlobalSearch"
+                    title="Clear search"
+                >
+                    <font-awesome-icon icon="times" />
+                </button>
+            </div>
+            <small v-if="globalSearchResultCount !== null" class="text-muted">
+                {{ $t("Found {0} monitors", [globalSearchResultCount]) }}
+            </small>
+        </div>
+        
         <template #item="group">
-            <div class="mb-5" data-testid="group">
+            <div v-if="group && group.element" class="mb-5" data-testid="group" v-show="shouldShowGroup(group.element)">
                 <!-- Group Title -->
                 <h2 class="group-title">
                     <font-awesome-icon v-if="editMode && showGroupDrag" icon="arrows-alt-v" class="action drag me-3" />
@@ -15,8 +41,8 @@
                     <Editable v-model="group.element.name" :contenteditable="editMode" tag="span" data-testid="group-name" />
                 </h2>
 
-                <!-- Sort Buttons - Moved below the title -->
-                <div v-if="!editMode && group.element.monitorList.length > 0" class="sort-controls-container mb-3">
+                <!-- Sort Buttons 与 搜索框 放在同一行 -->
+                <div v-if="!editMode && group.element && group.element.monitorList && group.element.monitorList.length > 0" class="sort-controls-container mb-3">
                     <div class="sort-controls">
                         <span class="sort-label me-2">{{ $t("Sort By") }}:</span>
                         <button
@@ -53,16 +79,41 @@
                             <font-awesome-icon v-if="group.element.sortKey === 'cert'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                         </button>
                     </div>
+                    
+                    <!-- 组内搜索框 -->
+                    <div v-if="group.element && group.element.monitorList" class="search-container">
+                        <div class="search-input-wrapper">
+                            <input 
+                                type="text" 
+                                v-model="group.element.searchKeyword" 
+                                :placeholder="$t('Search...')" 
+                                class="search-input form-control form-control-sm"
+                                @keyup.esc="clearSearch(group.element)"
+                            >
+                            <button 
+                                class="search-button btn btn-sm"
+                                @click="clearSearch(group.element)"
+                                v-if="group.element && group.element.searchKeyword"
+                                title="清除搜索"
+                            >
+                                <font-awesome-icon icon="times" />
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="shadow-box monitor-list mt-4 position-relative">
-                    <div v-if="group.element.monitorList.length === 0" class="text-center no-monitor-msg">
+                    <div v-if="!group.element || !group.element.monitorList || group.element.monitorList.length === 0" class="text-center no-monitor-msg">
                         {{ $t("No Monitors") }}
+                    </div>
+                    <div v-else-if="getFilteredMonitorList(group.element).length === 0" class="text-center no-monitor-msg">
+                        {{ $t("No services found") }}
                     </div>
 
                     <!-- Monitor List -->
                     <!-- animation is not working, no idea why -->
                     <Draggable
+                        v-if="group.element && group.element.monitorList && group.element.monitorList.length > 0"
                         v-model="group.element.monitorList"
                         class="monitor-list"
                         group="same-group"
@@ -71,7 +122,7 @@
                         item-key="id"
                     >
                         <template #item="{ element: monitor, index: monitorIndex }">
-                            <div class="item" data-testid="monitor">
+                            <div v-if="shouldShowMonitor(monitor, group.element)" class="item" data-testid="monitor">
                                 <div class="row">
                                     <div class="col-9 col-md-8 small-padding">
                                         <div class="info">
@@ -158,35 +209,88 @@ export default {
         slug: {
             type: String,
             default: 'default'
-        }
+        },
+        monitorList: {
+            type: Array,
+            default: () => [],
+        },
+        groups: {
+            type: Array,
+            default: () => [],
+        },
     },
     data() {
         return {
-            // Initialize sortKey and sortDirection for each group if they don't exist
-            // This is handled in the created hook or when groups are loaded
+            globalSearchKeyword: '',
+            searchText: "",
         };
     },
     computed: {
         showGroupDrag() {
-            return (this.$root.publicGroupList.length >= 2);
+            return (this.$root && this.$root.publicGroupList && this.$root.publicGroupList.length >= 2);
         },
+        hasMonitors() {
+            return this.groups && Array.isArray(this.groups) && this.groups.some(group => 
+                group && group.element && group.element.monitorList && group.element.monitorList.length > 0
+            );
+        },
+        filteredMonitorList() {
+            if (!this.searchText || !this.monitorList) {
+                return this.monitorList || [];
+            }
+            
+            const searchLower = this.searchText.toLowerCase();
+            return this.monitorList.filter(monitor => 
+                monitor && monitor.name && monitor.name.toLowerCase().includes(searchLower)
+            );
+        },
+        shouldShowSearch() {
+            return !this.editMode && this.monitorList && this.monitorList.length > 0;
+        },
+        globalSearchResultCount() {
+            if (!this.globalSearchKeyword) {
+                return null;
+            }
+            
+            let count = 0;
+            if (!this.groups) return count;
+            
+            for (const group of this.groups) {
+                if (!group || !group.element || !group.element.monitorList) continue;
+                
+                for (const monitor of group.element.monitorList) {
+                    if (monitor && this.matchesGlobalSearch(monitor)) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
     },
     watch: {
         // Watch for changes in heartbeatList to re-apply sort
         '$root.heartbeatList': {
             handler() {
-                this.$root.publicGroupList.forEach(group => {
-                    this.applySort(group);
-                });
+                if (this.$root && this.$root.publicGroupList) {
+                    this.$root.publicGroupList.forEach(group => {
+                        if (group) {
+                            this.applySort(group);
+                        }
+                    });
+                }
             },
             deep: true,
         },
         // Watch for changes in uptimeList to re-apply sort
         '$root.uptimeList': {
              handler() {
-                this.$root.publicGroupList.forEach(group => {
-                    this.applySort(group);
-                });
+                if (this.$root && this.$root.publicGroupList) {
+                    this.$root.publicGroupList.forEach(group => {
+                        if (group) {
+                            this.applySort(group);
+                        }
+                    });
+                }
             },
             deep: true,
         },
@@ -213,33 +317,15 @@ export default {
         };
 
         // Initialize sort state and apply initial sort for existing groups
-        this.$root.publicGroupList.forEach(group => {
-            // 尝试从 localStorage 中读取保存的排序设置
-            const savedSettings = getSavedSortSettings(group);
-            
-            if (savedSettings) {
-                // 如果找到保存的设置，应用它
-                group.sortKey = savedSettings.key;
-                group.sortDirection = savedSettings.direction;
-            } else {
-                // 否则使用默认设置
-                if (group.sortKey === undefined) {
-                    group.sortKey = 'status';
-                }
-                if (group.sortDirection === undefined) {
-                    group.sortDirection = 'desc';
-                }
-            }
-            
-            // Apply initial sort when the component is created
-            this.applySort(group);
-        });
-
-        // Watch for new groups being added and initialize their sort state
-        this.$root.$watch('publicGroupList', (newGroups) => {
-            newGroups.forEach(group => {
-                if (group.sortKey === undefined) {
-                    // 尝试从 localStorage 中读取排序设置
+        if (this.$root.publicGroupList) {
+            this.$root.publicGroupList.forEach(group => {
+                if (group) {
+                    // 初始化搜索关键词
+                    if (group.searchKeyword === undefined) {
+                        group.searchKeyword = '';
+                    }
+                    
+                    // 尝试从 localStorage 中读取保存的排序设置
                     const savedSettings = getSavedSortSettings(group);
                     
                     if (savedSettings) {
@@ -248,17 +334,176 @@ export default {
                         group.sortDirection = savedSettings.direction;
                     } else {
                         // 否则使用默认设置
-                        group.sortKey = 'status';
-                        group.sortDirection = 'desc';
+                        if (group.sortKey === undefined) {
+                            group.sortKey = 'status';
+                        }
+                        if (group.sortDirection === undefined) {
+                            group.sortDirection = 'desc';
+                        }
                     }
                     
-                    // Apply sort to newly added group
+                    // Apply initial sort when the component is created
                     this.applySort(group);
                 }
             });
-        }, { deep: true });
+        }
+
+        // Watch for new groups being added and initialize their sort state
+        if (this.$root) {
+            this.$root.$watch('publicGroupList', (newGroups) => {
+                if (newGroups) {
+                    newGroups.forEach(group => {
+                        if (group) {
+                            // 确保每个组都有搜索关键词属性
+                            if (group.searchKeyword === undefined) {
+                                group.searchKeyword = '';
+                            }
+                            
+                            if (group.sortKey === undefined) {
+                                // 尝试从 localStorage 中读取排序设置
+                                const savedSettings = getSavedSortSettings(group);
+                                
+                                if (savedSettings) {
+                                    // 如果找到保存的设置，应用它
+                                    group.sortKey = savedSettings.key;
+                                    group.sortDirection = savedSettings.direction;
+                                } else {
+                                    // 否则使用默认设置
+                                    group.sortKey = 'status';
+                                    group.sortDirection = 'desc';
+                                }
+                                
+                                // Apply sort to newly added group
+                                this.applySort(group);
+                            }
+                        }
+                    });
+                }
+            }, { deep: true });
+        }
+    },
+    unmounted() {
+        // 清理组件卸载时的引用，避免内存泄漏
+        // Vue 3 中 watcher 会在组件卸载时自动清理，不需要手动解除
     },
     methods: {
+        /**
+         * 判断监控项是否与搜索关键词匹配
+         * @param {object} monitor 监控项对象
+         * @param {string} keyword 搜索关键词
+         * @returns {boolean} 是否匹配
+         */
+        monitorMatchesSearch(monitor, keyword) {
+            if (!keyword) return true;
+            if (!monitor) return false;
+            
+            keyword = keyword.toLowerCase().trim();
+            
+            // 搜索名称、URL和描述字段
+            return (monitor.name && monitor.name.toLowerCase().includes(keyword)) || 
+                   (monitor.url && monitor.url.toLowerCase().includes(keyword)) || 
+                   (monitor.description && monitor.description.toLowerCase().includes(keyword));
+        },
+        
+        /**
+         * 判断监控项是否符合全局搜索条件
+         * @param {object} monitor 监控项对象
+         * @returns {boolean} 是否匹配
+         */
+        matchesGlobalSearch(monitor) {
+            if (!this.globalSearchKeyword) return true;
+            if (!monitor) return false;
+            
+            return this.monitorMatchesSearch(monitor, this.globalSearchKeyword);
+        },
+        
+        /**
+         * 判断监控项是否应该在界面上显示
+         * @param {object} monitor 监控项对象
+         * @param {object} group 分组对象
+         * @returns {boolean} 是否显示
+         */
+        shouldShowMonitor(monitor, group) {
+            if (!monitor) return false;
+            
+            // 先检查全局搜索
+            if (this.globalSearchKeyword && !this.matchesGlobalSearch(monitor)) {
+                return false;
+            }
+            
+            // 再检查组内搜索
+            if (group && group.searchKeyword) {
+                return this.monitorMatchesSearch(monitor, group.searchKeyword);
+            }
+            
+            return true;
+        },
+        
+        /**
+         * 获取过滤后的监控列表
+         * @param {object} group 分组对象
+         * @returns {array} 过滤后的监控列表
+         */
+        getFilteredMonitorList(group) {
+            if (!group || !group.monitorList || !Array.isArray(group.monitorList)) return [];
+            
+            let result = [...group.monitorList]; // 创建副本避免修改原数组
+            
+            // 先应用全局搜索
+            if (this.globalSearchKeyword) {
+                result = result.filter(monitor => 
+                    monitor && this.matchesGlobalSearch(monitor)
+                );
+            }
+            
+            // 再应用组内搜索
+            if (group.searchKeyword) {
+                result = result.filter(monitor => 
+                    monitor && this.monitorMatchesSearch(monitor, group.searchKeyword)
+                );
+            }
+            
+            return result;
+        },
+        
+        /**
+         * 判断是否应该显示分组
+         * @param {object} group 分组对象
+         * @returns {boolean} 是否应该显示
+         */
+        shouldShowGroup(group) {
+            if (!group) return false;
+            
+            // 编辑模式下总是显示
+            if (this.editMode) return true;
+            
+            // 如果有全局搜索，只显示包含匹配监控项的分组
+            if (this.globalSearchKeyword) {
+                return group.monitorList && group.monitorList.some(monitor => 
+                    this.matchesGlobalSearch(monitor)
+                );
+            }
+            
+            return true;
+        },
+        
+        /**
+         * 清除组内搜索关键词
+         * @param {object} group 分组对象
+         */
+        clearSearch(group) {
+            if (group) {
+                group.searchKeyword = '';
+            }
+        },
+        
+        /**
+         * 清除全局搜索关键词
+         */
+        clearGlobalSearch() {
+            this.globalSearchKeyword = '';
+        },
+        
         /**
          * Set sort key and direction for a group, then apply the sort
          * @param {object} group The group object
@@ -296,7 +541,7 @@ export default {
          * @param {object} group The group object containing monitorList
          */
         applySort(group) {
-            if (!group || !group.monitorList) {
+            if (!group || !group.monitorList || !Array.isArray(group.monitorList)) {
                 return;
             }
 
@@ -304,12 +549,16 @@ export default {
             const sortDirection = group.sortDirection || 'desc';
 
             group.monitorList.sort((a, b) => {
-                 let comparison = 0;
-                 let valueA, valueB;
+                if (!a || !b) return 0;
+                
+                let comparison = 0;
+                let valueA, valueB;
 
                 if (sortKey === 'status') {
                     const getStatusPriority = (monitor) => {
-                         // Ensure heartbeatList is available
+                        if (!monitor || !monitor.id) return 4;
+                        
+                        // Ensure heartbeatList is available
                         const hbList = this.$root.heartbeatList || {};
                         const hbArr = hbList[monitor.id];
                         if (hbArr && hbArr.length > 0) {
@@ -328,8 +577,8 @@ export default {
                     valueB = b.name ? b.name.toLowerCase() : '';
                 } else if (sortKey === 'uptime') {
                     const uptimeList = this.$root.uptimeList || {};
-                    const uptimeA = parseFloat(uptimeList[`${a.id}_24`]) || 0;
-                    const uptimeB = parseFloat(uptimeList[`${b.id}_24`]) || 0;
+                    const uptimeA = a.id ? parseFloat(uptimeList[`${a.id}_24`]) || 0 : 0;
+                    const uptimeB = b.id ? parseFloat(uptimeList[`${b.id}_24`]) || 0 : 0;
                     valueA = uptimeA;
                     valueB = uptimeB;
                 } else if (sortKey === 'cert') {
@@ -430,9 +679,58 @@ export default {
     align-items: center;
 }
 
+.search-container {
+    margin-left: auto; /* 推到右侧 */
+}
+
+.search-input-wrapper {
+    position: relative;
+    display: flex;
+}
+
+.search-input {
+    padding-right: 35px; /* 为清除按钮留出空间 */
+    max-width: 200px;
+    font-size: 0.85rem;
+    border: 1px solid #dee2e6;
+}
+
+.search-button {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    padding: 0 10px;
+    background: transparent;
+    border: none;
+    color: #6c757d;
+    cursor: pointer;
+}
+
+.search-button:hover {
+    color: #495057;
+}
+
+.dark {
+    .search-input {
+        background-color: lighten($dark-bg, 5%);
+        border-color: $dark-border-color;
+        color: $dark-font-color;
+    }
+    
+    .search-button {
+        color: $dark-font-color;
+    }
+    
+    .search-button:hover {
+        color: white;
+    }
+}
+
 .sort-controls-container {
     display: flex;
-    justify-content: flex-start;
+    justify-content: space-between;
+    align-items: center;
     margin-top: 0.5rem;
     border-bottom: 1px solid #f0f0f0;
     padding-bottom: 0.5rem;
@@ -570,6 +868,44 @@ export default {
 
 .bg-maintenance {
     background-color: $maintenance;
+}
+
+.global-search-container {
+    max-width: 500px;
+    margin: 0 auto;
+    
+    .input-group {
+        position: relative;
+        
+        .btn {
+            border-top-right-radius: 4px;
+            border-bottom-right-radius: 4px;
+            z-index: 3;
+        }
+    }
+    
+    small {
+        display: block;
+        text-align: center;
+        margin-top: 0.25rem;
+    }
+}
+
+@media (max-width: 768px) {
+    .sort-controls-container {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .search-container {
+        margin-left: 0;
+        margin-top: 0.5rem;
+        width: 100%;
+    }
+
+    .search-input {
+        max-width: 100%;
+    }
 }
 
 </style>
