@@ -18,13 +18,13 @@
                 <!-- Sort Buttons - Moved below the title -->
                 <div v-if="!editMode && group.element.monitorList.length > 0" class="sort-controls-container mb-3">
                     <div class="sort-controls">
-                        <span class="sort-label me-2">{{ $t("排序方式") }}:</span>
+                        <span class="sort-label me-2">{{ $t("Sort By") }}:</span>
                         <button
                             class="btn btn-sm sort-button"
                             :class="{'active': group.element.sortKey === 'status'}"
                             @click="setSort(group.element, 'status')"
                         >
-                            {{ $t("状态") }}
+                            {{ $t("Status") }}
                             <font-awesome-icon v-if="group.element.sortKey === 'status'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                         </button>
                         <button
@@ -32,7 +32,7 @@
                             :class="{'active': group.element.sortKey === 'name'}"
                             @click="setSort(group.element, 'name')"
                         >
-                            {{ $t("名称") }}
+                            {{ $t("Name") }}
                             <font-awesome-icon v-if="group.element.sortKey === 'name'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                         </button>
                         <button
@@ -40,7 +40,7 @@
                             :class="{'active': group.element.sortKey === 'uptime'}"
                             @click="setSort(group.element, 'uptime')"
                         >
-                            {{ $t("正常运行时间") }}
+                            {{ $t("Uptime") }}
                             <font-awesome-icon v-if="group.element.sortKey === 'uptime'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                         </button>
                         <button
@@ -49,7 +49,7 @@
                             :class="{'active': group.element.sortKey === 'cert'}"
                             @click="setSort(group.element, 'cert')"
                         >
-                            {{ $t("证书过期时间") }}
+                            {{ $t("Cert Exp.") }}
                             <font-awesome-icon v-if="group.element.sortKey === 'cert'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                         </button>
                     </div>

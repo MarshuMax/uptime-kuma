@@ -27,6 +27,7 @@
     "notificationDescription": "通知必须被分配给监控项才能正常工作。",
     "keywordDescription": "在纯 HTML 或 JSON 响应中搜索关键字，区分大小写。",
     "pauseDashboardHome": "暂停",
+    "Sort By": "排序方式",
     "deleteMonitorMsg": "确定要删除此监控项吗？",
     "deleteMaintenanceMsg": "确定要删除此维护吗？",
     "deleteNotificationMsg": "确定要为所有监控项删除此通知吗？",
