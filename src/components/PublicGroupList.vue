@@ -1,14 +1,8 @@
 <template>
     <!-- Group List -->
-    <Draggable
-        v-if="$root && $root.publicGroupList"
-        v-model="$root.publicGroupList"
-        :disabled="!editMode"
-        item-key="id"
-        :animation="100"
-    >
+    <div v-if="hasPublicGroups && !editMode" class="global-controls-container">
         <!-- 全局搜索框 -->
-        <div v-if="hasMonitors && !editMode" class="global-search-container mb-4">
+        <div class="global-search-container mb-3">
             <div class="input-group">
                 <input 
                     type="text" 
@@ -32,6 +26,70 @@
             </small>
         </div>
         
+        <!-- 全局排序栏 -->
+        <div class="global-sort-container mb-4">
+            <h5 class="text-center mb-2">{{ $t("Global Sorting Options") }}</h5>
+            <div class="sort-controls-container global-sort-bar">
+                <div class="sort-controls">
+                    <span class="sort-label me-2">{{ $t("Sort All Groups By") }}:</span>
+                    <button
+                        class="btn btn-sm sort-button"
+                        :class="{'active': globalSortKey === 'status' && isGlobalSortActive}"
+                        @click="setGlobalSort('status')"
+                    >
+                        {{ $t("Status") }}
+                        <font-awesome-icon v-if="globalSortKey === 'status' && isGlobalSortActive" :icon="globalSortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                    </button>
+                    <button
+                        class="btn btn-sm sort-button"
+                        :class="{'active': globalSortKey === 'name' && isGlobalSortActive}"
+                        @click="setGlobalSort('name')"
+                    >
+                        {{ $t("Name") }}
+                        <font-awesome-icon v-if="globalSortKey === 'name' && isGlobalSortActive" :icon="globalSortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                    </button>
+                    <button
+                        class="btn btn-sm sort-button"
+                        :class="{'active': globalSortKey === 'uptime' && isGlobalSortActive}"
+                        @click="setGlobalSort('uptime')"
+                    >
+                        {{ $t("Uptime") }}
+                        <font-awesome-icon v-if="globalSortKey === 'uptime' && isGlobalSortActive" :icon="globalSortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                    </button>
+                    <button
+                        v-if="showCertificateExpiry"
+                        class="btn btn-sm sort-button"
+                        :class="{'active': globalSortKey === 'cert' && isGlobalSortActive}"
+                        @click="setGlobalSort('cert')"
+                    >
+                        {{ $t("Cert Exp.") }}
+                        <font-awesome-icon v-if="globalSortKey === 'cert' && isGlobalSortActive" :icon="globalSortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                    </button>
+                    
+                    <button
+                        class="btn btn-sm ms-3"
+                        :class="{
+                            'btn-primary': isGlobalSortActive,
+                            'btn-outline-secondary': !isGlobalSortActive
+                        }"
+                        @click="toggleGlobalSort"
+                        title="启用/禁用全局排序"
+                    >
+                        <font-awesome-icon :icon="isGlobalSortActive ? 'check-circle' : 'times-circle'" class="me-1" />
+                        {{ isGlobalSortActive ? $t('Global Sort Enabled') : $t('Global Sort Disabled') }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <Draggable
+        v-if="$root && $root.publicGroupList"
+        v-model="$root.publicGroupList"
+        :disabled="!editMode"
+        item-key="id"
+        :animation="100"
+    >
         <template #item="group">
             <div v-if="group && group.element" class="mb-5" data-testid="group" v-show="shouldShowGroup(group.element)">
                 <!-- Group Title -->
@@ -223,6 +281,9 @@ export default {
         return {
             globalSearchKeyword: '',
             searchText: "",
+            globalSortKey: 'status',
+            globalSortDirection: 'desc',
+            isGlobalSortActive: false,
         };
     },
     computed: {
@@ -233,6 +294,15 @@ export default {
             return this.groups && Array.isArray(this.groups) && this.groups.some(group => 
                 group && group.element && group.element.monitorList && group.element.monitorList.length > 0
             );
+        },
+        hasPublicGroups() {
+            return this.$root && 
+                   this.$root.publicGroupList && 
+                   Array.isArray(this.$root.publicGroupList) && 
+                   this.$root.publicGroupList.length > 0 &&
+                   this.$root.publicGroupList.some(group => 
+                       group && group.monitorList && group.monitorList.length > 0
+                   );
         },
         filteredMonitorList() {
             if (!this.searchText || !this.monitorList) {
@@ -294,6 +364,17 @@ export default {
             },
             deep: true,
         },
+        // 监听全局排序变化
+        globalSortKey: {
+            handler() {
+                this.applyGlobalSort();
+            }
+        },
+        globalSortDirection: {
+            handler() {
+                this.applyGlobalSort();
+            }
+        }
     },
     created() {
         // 从 localStorage 获取排序设置的方法
@@ -315,6 +396,21 @@ export default {
             }
             return null;
         };
+
+        // 尝试从 localStorage 中读取保存的全局排序设置
+        try {
+            const storageKey = `uptime-kuma-global-sort-${this.slug}`;
+            const savedGlobalSettings = localStorage.getItem(storageKey);
+            if (savedGlobalSettings) {
+                const settings = JSON.parse(savedGlobalSettings);
+                this.globalSortKey = settings.key;
+                this.globalSortDirection = settings.direction;
+                // 同时恢复全局排序激活状态
+                this.isGlobalSortActive = settings.active === undefined ? false : settings.active;
+            }
+        } catch (error) {
+            console.error('无法读取全局排序设置', error);
+        }
 
         // Initialize sort state and apply initial sort for existing groups
         if (this.$root.publicGroupList) {
@@ -347,6 +443,9 @@ export default {
                 }
             });
         }
+
+        // 初始化后应用全局排序
+        this.applyGlobalSort();
 
         // Watch for new groups being added and initialize their sort state
         if (this.$root) {
@@ -537,18 +636,98 @@ export default {
         },
 
         /**
-         * Apply sorting logic directly to the group's monitorList (in-place)
-         * @param {object} group The group object containing monitorList
+         * Set global sort key and direction
+         * @param {string} key The sort key ('status', 'name', 'uptime', 'cert')
          */
-        applySort(group) {
-            if (!group || !group.monitorList || !Array.isArray(group.monitorList)) {
+        setGlobalSort(key) {
+            // 更新全局排序设置
+            if (this.globalSortKey === key) {
+                this.globalSortDirection = this.globalSortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                this.globalSortKey = key;
+                this.globalSortDirection = (key === 'status') ? 'desc' : 'asc';
+            }
+            
+            // 激活全局排序
+            this.isGlobalSortActive = true;
+            
+            // 保存全局排序设置到 localStorage
+            try {
+                const storageKey = `uptime-kuma-global-sort-${this.slug}`;
+                
+                // 保存全局排序设置
+                const globalSortSettings = {
+                    key: this.globalSortKey,
+                    direction: this.globalSortDirection,
+                    active: this.isGlobalSortActive
+                };
+                localStorage.setItem(storageKey, JSON.stringify(globalSortSettings));
+            } catch (error) {
+                console.error('无法保存全局排序设置', error);
+            }
+            
+            // 应用全局排序 - 不修改各组的原始排序设置
+            this.applyGlobalSort();
+        },
+
+        /**
+         * 禁用全局排序，恢复各组独立排序
+         */
+        disableGlobalSort() {
+            this.isGlobalSortActive = false;
+            
+            // 保存设置
+            try {
+                const storageKey = `uptime-kuma-global-sort-${this.slug}`;
+                const globalSortSettings = {
+                    key: this.globalSortKey,
+                    direction: this.globalSortDirection,
+                    active: false
+                };
+                localStorage.setItem(storageKey, JSON.stringify(globalSortSettings));
+            } catch (error) {
+                console.error('无法保存全局排序设置', error);
+            }
+            
+            // 恢复各组的原始排序
+            if (this.$root && this.$root.publicGroupList) {
+                this.$root.publicGroupList.forEach(group => {
+                    if (group) {
+                        this.applySort(group);
+                    }
+                });
+            }
+        },
+
+        /**
+         * Apply global sorting logic to all groups
+         */
+        applyGlobalSort() {
+            if (!this.isGlobalSortActive || !this.$root || !this.$root.publicGroupList) {
+                return;
+            }
+            
+            // 临时应用全局排序设置到所有组，但不修改各组的排序设置属性
+            this.$root.publicGroupList.forEach(group => {
+                if (group && group.monitorList) {
+                    // 使用全局排序设置进行排序，但不修改group本身的sortKey和sortDirection
+                    this.sortMonitorList(group.monitorList, this.globalSortKey, this.globalSortDirection);
+                }
+            });
+        },
+        
+        /**
+         * 对监控列表进行排序，不修改组的排序设置
+         * @param {array} monitorList 要排序的监控列表
+         * @param {string} sortKey 排序键
+         * @param {string} sortDirection 排序方向
+         */
+        sortMonitorList(monitorList, sortKey, sortDirection) {
+            if (!Array.isArray(monitorList)) {
                 return;
             }
 
-            const sortKey = group.sortKey || 'status';
-            const sortDirection = group.sortDirection || 'desc';
-
-            group.monitorList.sort((a, b) => {
+            monitorList.sort((a, b) => {
                 if (!a || !b) return 0;
                 
                 let comparison = 0;
@@ -603,6 +782,26 @@ export default {
                 }
             });
         },
+
+        /**
+         * Apply sorting logic directly to the group's monitorList (in-place)
+         * @param {object} group The group object containing monitorList
+         */
+        applySort(group) {
+            if (!group || !group.monitorList || !Array.isArray(group.monitorList)) {
+                return;
+            }
+
+            // 如果全局排序已激活，使用全局排序设置；否则使用分组自己的排序设置
+            if (this.isGlobalSortActive) {
+                this.sortMonitorList(group.monitorList, this.globalSortKey, this.globalSortDirection);
+            } else {
+                const sortKey = group.sortKey || 'status';
+                const sortDirection = group.sortDirection || 'desc';
+                this.sortMonitorList(group.monitorList, sortKey, sortDirection);
+            }
+        },
+
         /**
          * Remove the specified group
          * @param {number} index Index of group to remove
@@ -666,6 +865,26 @@ export default {
                 return "#059669";
             }
             return "#DC2626";
+        },
+
+        toggleGlobalSort() {
+            this.isGlobalSortActive = !this.isGlobalSortActive;
+            
+            // 保存设置
+            try {
+                const storageKey = `uptime-kuma-global-sort-${this.slug}`;
+                const globalSortSettings = {
+                    key: this.globalSortKey,
+                    direction: this.globalSortDirection,
+                    active: this.isGlobalSortActive
+                };
+                localStorage.setItem(storageKey, JSON.stringify(globalSortSettings));
+            } catch (error) {
+                console.error('无法保存全局排序设置', error);
+            }
+            
+            // 应用全局排序 - 不修改各组的原始排序设置
+            this.applyGlobalSort();
         },
     }
 };
@@ -870,9 +1089,20 @@ export default {
     background-color: $maintenance;
 }
 
+.global-controls-container {
+    width: 100%;
+    max-width: none;
+    margin: 0 0 2rem 0;
+    padding: 1rem;
+    background-color: #f0f4f8;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border: 1px solid #e0e6ed;
+}
+
 .global-search-container {
-    max-width: 500px;
-    margin: 0 auto;
+    max-width: 600px;
+    margin: 0 auto 1rem auto;
     
     .input-group {
         position: relative;
@@ -888,6 +1118,50 @@ export default {
         display: block;
         text-align: center;
         margin-top: 0.25rem;
+    }
+}
+
+.global-sort-container {
+    max-width: 100%;
+    margin: 0 auto;
+    
+    .sort-controls-container {
+        border-radius: 0.25rem;
+        padding: 0.75rem;
+        background-color: #ffffff;
+        border: 1px solid #e0e6ed;
+        margin-top: 0.5rem;
+    }
+    
+    .sort-controls {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    .sort-label {
+        font-weight: 600;
+        color: #495057;
+        margin-right: 0.5rem;
+    }
+}
+
+.dark {
+    .global-controls-container {
+        background-color: #2d3748;
+        border-color: #4a5568;
+    }
+    
+    .global-sort-container {
+        .sort-controls-container {
+            background-color: #1a202c;
+            border-color: #4a5568;
+        }
+        
+        .sort-label {
+            color: #e2e8f0;
+        }
     }
 }
 
