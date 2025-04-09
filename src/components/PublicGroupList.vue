@@ -41,6 +41,15 @@
                             {{ $t("正常运行时间") }}
                              <font-awesome-icon v-if="group.element.sortKey === 'uptime'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                         </button>
+                        <button
+                            v-if="showCertificateExpiry"
+                            class="btn btn-sm sort-button"
+                            :class="{'active': group.element.sortKey === 'cert'}"
+                            @click="setSort(group.element, 'cert')"
+                        >
+                            {{ $t("证书过期时间") }}
+                             <font-awesome-icon v-if="group.element.sortKey === 'cert'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                        </button>
                     </span>
                 </h2>
 
@@ -142,6 +151,11 @@ export default {
         /** Should expiry be shown? */
         showCertificateExpiry: {
             type: Boolean,
+        },
+        /** Status page slug */
+        slug: {
+            type: String,
+            default: 'default'
         }
     },
     data() {
@@ -176,24 +190,77 @@ export default {
         },
     },
     created() {
+        // 从 localStorage 获取排序设置的方法
+        const getSavedSortSettings = (group) => {
+            try {
+                const groupId = group.id || group.name || '默认分组';
+                const storageKey = `uptime-kuma-sort-${this.slug}-${groupId}`;
+                
+                const savedSettings = localStorage.getItem(storageKey);
+                if (savedSettings) {
+                    const settings = JSON.parse(savedSettings);
+                    return {
+                        key: settings.key,
+                        direction: settings.direction
+                    };
+                }
+            } catch (error) {
+                console.error('无法读取排序设置', error);
+            }
+            return null;
+        };
+
         // Initialize sort state and apply initial sort for existing groups
         this.$root.publicGroupList.forEach(group => {
-            // Use direct assignment, Vue 3 should handle reactivity
-            if (group.sortKey === undefined) {
-                group.sortKey = 'status';
+            // 尝试从 localStorage 中读取保存的排序设置
+            const savedSettings = getSavedSortSettings(group);
+            
+            if (savedSettings) {
+                // 如果找到保存的设置，应用它
+                group.sortKey = savedSettings.key;
+                group.sortDirection = savedSettings.direction;
+            } else {
+                // 否则使用默认设置
+                if (group.sortKey === undefined) {
+                    group.sortKey = 'status';
+                }
+                if (group.sortDirection === undefined) {
+                    group.sortDirection = 'desc';
+                }
             }
-            if (group.sortDirection === undefined) {
-                 group.sortDirection = 'desc';
-            }
+            
             // Apply initial sort when the component is created
             this.applySort(group);
         });
+
+        // Watch for new groups being added and initialize their sort state
+        this.$root.$watch('publicGroupList', (newGroups) => {
+            newGroups.forEach(group => {
+                if (group.sortKey === undefined) {
+                    // 尝试从 localStorage 中读取排序设置
+                    const savedSettings = getSavedSortSettings(group);
+                    
+                    if (savedSettings) {
+                        // 如果找到保存的设置，应用它
+                        group.sortKey = savedSettings.key;
+                        group.sortDirection = savedSettings.direction;
+                    } else {
+                        // 否则使用默认设置
+                        group.sortKey = 'status';
+                        group.sortDirection = 'desc';
+                    }
+                    
+                    // Apply sort to newly added group
+                    this.applySort(group);
+                }
+            });
+        }, { deep: true });
     },
     methods: {
         /**
          * Set sort key and direction for a group, then apply the sort
          * @param {object} group The group object
-         * @param {string} key The sort key ('status', 'name', 'uptime')
+         * @param {string} key The sort key ('status', 'name', 'uptime', 'cert')
          */
         setSort(group, key) {
             if (group.sortKey === key) {
@@ -202,6 +269,23 @@ export default {
                 group.sortKey = key;
                 group.sortDirection = (key === 'status') ? 'desc' : 'asc';
             }
+            
+            // 保存排序设置到 localStorage
+            try {
+                // 获取分组的唯一标识，如果没有 id 则使用名称
+                const groupId = group.id || group.name || '默认分组';
+                const storageKey = `uptime-kuma-sort-${this.slug}-${groupId}`;
+                
+                // 保存排序设置
+                const sortSettings = {
+                    key: group.sortKey,
+                    direction: group.sortDirection
+                };
+                localStorage.setItem(storageKey, JSON.stringify(sortSettings));
+            } catch (error) {
+                console.error('无法保存排序设置', error);
+            }
+            
             this.applySort(group); // Apply sort immediately after changing settings
         },
 
@@ -246,6 +330,11 @@ export default {
                     const uptimeB = parseFloat(uptimeList[`${b.id}_24`]) || 0;
                     valueA = uptimeA;
                     valueB = uptimeB;
+                } else if (sortKey === 'cert') {
+                    // 按证书过期时间排序
+                    // 有效证书的监控器值为剩余天数，无效证书或没有证书的值为 -1
+                    valueA = a.validCert && a.certExpiryDaysRemaining ? a.certExpiryDaysRemaining : -1;
+                    valueB = b.validCert && b.certExpiryDaysRemaining ? b.certExpiryDaysRemaining : -1;
                 }
 
                 if (valueA < valueB) {
@@ -343,21 +432,26 @@ export default {
 .sort-controls {
     display: inline-flex;
     align-items: center;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
     font-size: 0.85rem; /* Smaller font for sort controls */
     margin-left: auto; /* Pushes sort controls to the right */
 }
 
 .sort-label {
     white-space: nowrap;
+    margin-bottom: 0.25rem;
 }
 
 .sort-button {
     padding: 0.2rem 0.5rem;
     margin-left: 0.25rem;
+    margin-bottom: 0.25rem; /* 为换行提供更好的间距 */
     background-color: transparent;
     border: 1px solid #dee2e6;
     color: #6c757d;
     transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
+    white-space: nowrap; /* 防止按钮文字换行 */
+    font-size: 0.75rem; /* 略微减小字体大小 */
 
     &:hover {
         background-color: #e9ecef;

@@ -328,7 +328,7 @@
                     👀 {{ $t("statusPageNothing") }}
                 </div>
 
-                <PublicGroupList :edit-mode="enableEditMode" :show-tags="config.showTags" :show-certificate-expiry="config.showCertificateExpiry" />
+                <PublicGroupList :edit-mode="enableEditMode" :show-tags="config.showTags" :show-certificate-expiry="config.showCertificateExpiry" :slug="slug" />
             </div>
 
             <footer class="mt-5 mb-4">
