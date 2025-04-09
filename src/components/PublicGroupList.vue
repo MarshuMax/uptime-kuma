@@ -13,6 +13,35 @@
                     <font-awesome-icon v-if="editMode && showGroupDrag" icon="arrows-alt-v" class="action drag me-3" />
                     <font-awesome-icon v-if="editMode" icon="times" class="action remove me-3" @click="removeGroup(group.index)" />
                     <Editable v-model="group.element.name" :contenteditable="editMode" tag="span" data-testid="group-name" />
+
+                    <!-- Sort Buttons - Added Here -->
+                    <span v-if="!editMode && group.element.monitorList.length > 0" class="sort-controls ms-3">
+                        <span class="sort-label me-2">{{ $t("排序方式") }}:</span>
+                        <button
+                            class="btn btn-sm sort-button"
+                            :class="{'active': group.element.sortKey === 'status'}"
+                            @click="setSort(group.element, 'status')"
+                        >
+                            {{ $t("状态") }}
+                            <font-awesome-icon v-if="group.element.sortKey === 'status'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                        </button>
+                        <button
+                            class="btn btn-sm sort-button"
+                            :class="{'active': group.element.sortKey === 'name'}"
+                            @click="setSort(group.element, 'name')"
+                        >
+                            {{ $t("名称") }}
+                            <font-awesome-icon v-if="group.element.sortKey === 'name'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                        </button>
+                         <button
+                            class="btn btn-sm sort-button"
+                            :class="{'active': group.element.sortKey === 'uptime'}"
+                            @click="setSort(group.element, 'uptime')"
+                        >
+                            {{ $t("正常运行时间") }}
+                             <font-awesome-icon v-if="group.element.sortKey === 'uptime'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                        </button>
+                    </span>
                 </h2>
 
                 <div class="shadow-box monitor-list mt-4 position-relative">
@@ -30,26 +59,26 @@
                         :animation="100"
                         item-key="id"
                     >
-                        <template #item="monitor">
+                        <template #item="{ element: monitor, index: monitorIndex }">
                             <div class="item" data-testid="monitor">
                                 <div class="row">
                                     <div class="col-9 col-md-8 small-padding">
                                         <div class="info">
                                             <font-awesome-icon v-if="editMode" icon="arrows-alt-v" class="action drag me-3" />
-                                            <font-awesome-icon v-if="editMode" icon="times" class="action remove me-3" @click="removeMonitor(group.index, monitor.index)" />
+                                            <font-awesome-icon v-if="editMode" icon="times" class="action remove me-3" @click="removeMonitor(group.index, monitorIndex)" />
 
-                                            <Uptime :monitor="monitor.element" type="24" :pill="true" />
+                                            <Uptime :monitor="monitor" type="24" :pill="true" />
                                             <a
                                                 v-if="showLink(monitor)"
-                                                :href="monitor.element.url"
+                                                :href="monitor.url"
                                                 class="item-name"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 data-testid="monitor-name"
                                             >
-                                                {{ monitor.element.name }}
+                                                {{ monitor.name }}
                                             </a>
-                                            <p v-else class="item-name" data-testid="monitor-name"> {{ monitor.element.name }} </p>
+                                            <p v-else class="item-name" data-testid="monitor-name"> {{ monitor.name }} </p>
 
                                             <span
                                                 title="Setting"
@@ -58,21 +87,21 @@
                                                     v-if="editMode"
                                                     :class="{'link-active': true, 'btn-link': true}"
                                                     icon="cog" class="action me-3"
-                                                    @click="$refs.monitorSettingDialog.show(group, monitor)"
+                                                    @click="$refs.monitorSettingDialog.show(group.element, monitor)"
                                                 />
                                             </span>
                                         </div>
                                         <div class="extra-info">
-                                            <div v-if="showCertificateExpiry && monitor.element.certExpiryDaysRemaining">
+                                            <div v-if="showCertificateExpiry && monitor.certExpiryDaysRemaining">
                                                 <Tag :item="{name: $t('Cert Exp.'), value: formattedCertExpiryMessage(monitor), color: certExpiryColor(monitor)}" :size="'sm'" />
                                             </div>
                                             <div v-if="showTags">
-                                                <Tag v-for="tag in monitor.element.tags" :key="tag" :item="tag" :size="'sm'" data-testid="monitor-tag" />
+                                                <Tag v-for="tag in monitor.tags" :key="tag" :item="tag" :size="'sm'" data-testid="monitor-tag" />
                                             </div>
                                         </div>
                                     </div>
                                     <div :key="$root.userHeartbeatBar" class="col-3 col-md-4">
-                                        <HeartbeatBar size="mid" :monitor-id="monitor.element.id" />
+                                        <HeartbeatBar size="mid" :monitor-id="monitor.id" />
                                     </div>
                                 </div>
                             </div>
@@ -117,18 +146,123 @@ export default {
     },
     data() {
         return {
-
+            // Initialize sortKey and sortDirection for each group if they don't exist
+            // This is handled in the created hook or when groups are loaded
         };
     },
     computed: {
         showGroupDrag() {
             return (this.$root.publicGroupList.length >= 2);
-        }
+        },
+    },
+    watch: {
+        // Watch for changes in heartbeatList to re-apply sort
+        '$root.heartbeatList': {
+            handler() {
+                this.$root.publicGroupList.forEach(group => {
+                    this.applySort(group);
+                });
+            },
+            deep: true,
+        },
+        // Watch for changes in uptimeList to re-apply sort
+        '$root.uptimeList': {
+             handler() {
+                this.$root.publicGroupList.forEach(group => {
+                    this.applySort(group);
+                });
+            },
+            deep: true,
+        },
     },
     created() {
-
+        // Initialize sort state and apply initial sort for existing groups
+        this.$root.publicGroupList.forEach(group => {
+            // Use direct assignment, Vue 3 should handle reactivity
+            if (group.sortKey === undefined) {
+                group.sortKey = 'status';
+            }
+            if (group.sortDirection === undefined) {
+                 group.sortDirection = 'desc';
+            }
+            // Apply initial sort when the component is created
+            this.applySort(group);
+        });
     },
     methods: {
+        /**
+         * Set sort key and direction for a group, then apply the sort
+         * @param {object} group The group object
+         * @param {string} key The sort key ('status', 'name', 'uptime')
+         */
+        setSort(group, key) {
+            if (group.sortKey === key) {
+                group.sortDirection = group.sortDirection === 'asc' ? 'desc' : 'asc';
+            } else {
+                group.sortKey = key;
+                group.sortDirection = (key === 'status') ? 'desc' : 'asc';
+            }
+            this.applySort(group); // Apply sort immediately after changing settings
+        },
+
+        /**
+         * Apply sorting logic directly to the group's monitorList (in-place)
+         * @param {object} group The group object containing monitorList
+         */
+        applySort(group) {
+            if (!group || !group.monitorList) {
+                return;
+            }
+
+            const sortKey = group.sortKey || 'status';
+            const sortDirection = group.sortDirection || 'desc';
+
+            group.monitorList.sort((a, b) => {
+                 let comparison = 0;
+                 let valueA, valueB;
+
+                if (sortKey === 'status') {
+                    const getStatusPriority = (monitor) => {
+                         // Ensure heartbeatList is available
+                        const hbList = this.$root.heartbeatList || {};
+                        const hbArr = hbList[monitor.id];
+                        if (hbArr && hbArr.length > 0) {
+                            const lastStatus = hbArr.at(-1).status;
+                            if (lastStatus === 0) return 0; // Down
+                            if (lastStatus === 1) return 1; // Up
+                            if (lastStatus === 2) return 2; // Pending
+                            if (lastStatus === 3) return 3; // Maintenance
+                        }
+                        return 4; // Unknown/No data - sort last
+                    };
+                    valueA = getStatusPriority(a);
+                    valueB = getStatusPriority(b);
+                } else if (sortKey === 'name') {
+                    valueA = a.name ? a.name.toLowerCase() : '';
+                    valueB = b.name ? b.name.toLowerCase() : '';
+                } else if (sortKey === 'uptime') {
+                    const uptimeList = this.$root.uptimeList || {};
+                    const uptimeA = parseFloat(uptimeList[`${a.id}_24`]) || 0;
+                    const uptimeB = parseFloat(uptimeList[`${b.id}_24`]) || 0;
+                    valueA = uptimeA;
+                    valueB = uptimeB;
+                }
+
+                if (valueA < valueB) {
+                    comparison = -1;
+                } else if (valueA > valueB) {
+                    comparison = 1;
+                }
+
+                // 只在按状态排序时，才特殊处理宕机服务器的位置
+                if (sortKey === 'status') {
+                    return sortDirection === 'desc' ? (comparison * -1) : comparison;
+                } else {
+                    // 使用纯粹的排序结果，不特殊处理宕机服务器
+                    return sortDirection === 'asc' ? comparison : (comparison * -1);
+                }
+            });
+        },
         /**
          * Remove the specified group
          * @param {number} index Index of group to remove
@@ -162,9 +296,9 @@ export default {
             // We must check if there are any elements in monitorList to
             // prevent undefined errors if it hasn't been loaded yet
             if (this.$parent.editMode && ignoreSendUrl && Object.keys(this.$root.monitorList).length) {
-                return this.$root.monitorList[monitor.element.id].type === "http" || this.$root.monitorList[monitor.element.id].type === "keyword" || this.$root.monitorList[monitor.element.id].type === "json-query";
+                return this.$root.monitorList[monitor.id].type === "http" || this.$root.monitorList[monitor.id].type === "keyword" || this.$root.monitorList[monitor.id].type === "json-query";
             }
-            return monitor.element.sendUrl && monitor.element.url && monitor.element.url !== "https://";
+            return monitor.sendUrl && monitor.url && monitor.url !== "https://";
         },
 
         /**
@@ -173,9 +307,9 @@ export default {
          * @returns {string} Certificate expiry message
          */
         formattedCertExpiryMessage(monitor) {
-            if (monitor?.element?.validCert && monitor?.element?.certExpiryDaysRemaining) {
-                return monitor.element.certExpiryDaysRemaining + " " + this.$tc("day", monitor.element.certExpiryDaysRemaining);
-            } else if (monitor?.element?.validCert === false) {
+            if (monitor?.validCert && monitor?.certExpiryDaysRemaining) {
+                return monitor.certExpiryDaysRemaining + " " + this.$tc("day", monitor.certExpiryDaysRemaining);
+            } else if (monitor?.validCert === false) {
                 return this.$t("noOrBadCertificate");
             } else {
                 return this.$t("Unknown") + " " + this.$tc("day", 2);
@@ -188,7 +322,7 @@ export default {
          * @returns {string} Color for certificate expiry
          */
         certExpiryColor(monitor) {
-            if (monitor?.element?.validCert && monitor.element.certExpiryDaysRemaining > 7) {
+            if (monitor?.validCert && monitor.certExpiryDaysRemaining > 7) {
                 return "#059669";
             }
             return "#DC2626";
@@ -199,6 +333,68 @@ export default {
 
 <style lang="scss" scoped>
 @import "../assets/vars";
+
+.group-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+.sort-controls {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.85rem; /* Smaller font for sort controls */
+    margin-left: auto; /* Pushes sort controls to the right */
+}
+
+.sort-label {
+    white-space: nowrap;
+}
+
+.sort-button {
+    padding: 0.2rem 0.5rem;
+    margin-left: 0.25rem;
+    background-color: transparent;
+    border: 1px solid #dee2e6;
+    color: #6c757d;
+    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
+
+    &:hover {
+        background-color: #e9ecef;
+        border-color: #adb5bd;
+        color: #495057;
+    }
+
+    &.active {
+        background-color: $primary;
+        border-color: $primary;
+        color: white;
+    }
+
+    .fa-arrow-up,
+    .fa-arrow-down {
+        margin-left: 0.3em;
+    }
+}
+
+.dark {
+    .sort-button {
+        border-color: $dark-border-color;
+        color: $dark-font-color;
+
+        &:hover {
+             background-color: lighten($dark-bg, 5%);
+             border-color: lighten($dark-border-color, 10%);
+             color: lighten($dark-font-color, 10%);
+        }
+
+        &.active {
+            background-color: $primary;
+            border-color: $primary;
+            color: white;
+        }
+    }
+}
 
 .extra-info {
     display: flex;
@@ -251,13 +447,6 @@ export default {
 
 .remove {
     color: $danger;
-}
-
-.group-title {
-    span {
-        display: inline-block;
-        min-width: 15px;
-    }
 }
 
 .mobile {
