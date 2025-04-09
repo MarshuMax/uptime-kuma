@@ -13,9 +13,11 @@
                     <font-awesome-icon v-if="editMode && showGroupDrag" icon="arrows-alt-v" class="action drag me-3" />
                     <font-awesome-icon v-if="editMode" icon="times" class="action remove me-3" @click="removeGroup(group.index)" />
                     <Editable v-model="group.element.name" :contenteditable="editMode" tag="span" data-testid="group-name" />
+                </h2>
 
-                    <!-- Sort Buttons - Added Here -->
-                    <span v-if="!editMode && group.element.monitorList.length > 0" class="sort-controls ms-3">
+                <!-- Sort Buttons - Moved below the title -->
+                <div v-if="!editMode && group.element.monitorList.length > 0" class="sort-controls-container mb-3">
+                    <div class="sort-controls">
                         <span class="sort-label me-2">{{ $t("排序方式") }}:</span>
                         <button
                             class="btn btn-sm sort-button"
@@ -33,13 +35,13 @@
                             {{ $t("名称") }}
                             <font-awesome-icon v-if="group.element.sortKey === 'name'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                         </button>
-                         <button
+                        <button
                             class="btn btn-sm sort-button"
                             :class="{'active': group.element.sortKey === 'uptime'}"
                             @click="setSort(group.element, 'uptime')"
                         >
                             {{ $t("正常运行时间") }}
-                             <font-awesome-icon v-if="group.element.sortKey === 'uptime'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                            <font-awesome-icon v-if="group.element.sortKey === 'uptime'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                         </button>
                         <button
                             v-if="showCertificateExpiry"
@@ -48,10 +50,10 @@
                             @click="setSort(group.element, 'cert')"
                         >
                             {{ $t("证书过期时间") }}
-                             <font-awesome-icon v-if="group.element.sortKey === 'cert'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
+                            <font-awesome-icon v-if="group.element.sortKey === 'cert'" :icon="group.element.sortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                         </button>
-                    </span>
-                </h2>
+                    </div>
+                </div>
 
                 <div class="shadow-box monitor-list mt-4 position-relative">
                     <div v-if="group.element.monitorList.length === 0" class="text-center no-monitor-msg">
@@ -426,7 +428,14 @@ export default {
 .group-title {
     display: flex;
     align-items: center;
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+.sort-controls-container {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: 0.5rem;
+    border-bottom: 1px solid #f0f0f0;
+    padding-bottom: 0.5rem;
 }
 
 .sort-controls {
@@ -434,12 +443,13 @@ export default {
     align-items: center;
     flex-wrap: wrap; /* Allow wrapping on smaller screens */
     font-size: 0.85rem; /* Smaller font for sort controls */
-    margin-left: auto; /* Pushes sort controls to the right */
 }
 
 .sort-label {
     white-space: nowrap;
     margin-bottom: 0.25rem;
+    font-weight: 500;
+    color: #6c757d;
 }
 
 .sort-button {
@@ -472,6 +482,15 @@ export default {
 }
 
 .dark {
+    .sort-controls-container {
+        border-bottom: 1px solid $dark-border-color;
+        padding-bottom: 0.5rem;
+    }
+    
+    .sort-label {
+        color: $dark-font-color;
+    }
+    
     .sort-button {
         border-color: $dark-border-color;
         color: $dark-font-color;
