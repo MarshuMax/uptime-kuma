@@ -1046,8 +1046,6 @@ export default {
 
 .sort-bar {
     padding: 0.5rem 0;
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
     margin-left: -1px;
     margin-right: -1px;
     width: calc(100% + 2px);
