@@ -4,32 +4,7 @@
         <!-- 全局排序标题 -->
         <h5 class="text-center mb-3">{{ $t("Global Sorting Options") }}</h5>
         
-        <!-- 全局搜索框 -->
-        <div class="global-search-container mb-3">
-            <div class="input-group">
-                <input 
-                    type="text" 
-                    class="form-control" 
-                    v-model="globalSearchKeyword" 
-                    :placeholder="$t('Search across all monitors...')" 
-                    aria-label="Global search"
-                >
-                <button 
-                    v-if="globalSearchKeyword" 
-                    class="btn btn-outline-secondary" 
-                    type="button" 
-                    @click="clearGlobalSearch"
-                    title="Clear search"
-                >
-                    <font-awesome-icon icon="times" />
-                </button>
-            </div>
-            <small v-if="globalSearchResultCount !== null" class="text-muted">
-                {{ $t("Found {0} monitors", [globalSearchResultCount]) }}
-            </small>
-        </div>
-        
-        <!-- 全局排序栏 -->
+        <!-- 全局排序栏和搜索框 -->
         <div class="global-sort-container mb-4">
             <div class="sort-controls-container global-sort-bar">
                 <div class="sort-controls">
@@ -67,20 +42,31 @@
                         {{ $t("Cert Exp.") }}
                         <font-awesome-icon v-if="globalSortKey === 'cert' && isGlobalSortActive" :icon="globalSortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                     </button>
-                    
-                    <button
-                        class="btn btn-sm ms-3"
-                        :class="{
-                            'btn-primary': isGlobalSortActive && !hasAnyGroupWithIndependentSort,
-                            'btn-outline-primary': isGlobalSortActive && hasAnyGroupWithIndependentSort,
-                            'btn-outline-secondary': !isGlobalSortActive
-                        }"
-                        @click="toggleGlobalSort"
-                        title="启用/禁用全局排序"
-                    >
-                        <font-awesome-icon :icon="isGlobalSortActive ? 'check-circle' : 'times-circle'" class="me-1" />
-                        {{ isGlobalSortActive ? $t('Global Sort Enabled') : $t('Global Sort Disabled') }}
-                    </button>
+                </div>
+                
+                <!-- 全局搜索框 -->
+                <div class="global-search-container">
+                    <div class="input-group">
+                        <input 
+                            type="text" 
+                            class="form-control form-control-sm" 
+                            v-model="globalSearchKeyword" 
+                            :placeholder="$t('Search across all monitors...')" 
+                            aria-label="Global search"
+                        >
+                        <button 
+                            v-if="globalSearchKeyword" 
+                            class="btn btn-outline-secondary btn-sm" 
+                            type="button" 
+                            @click="clearGlobalSearch"
+                            title="Clear search"
+                        >
+                            <font-awesome-icon icon="times" />
+                        </button>
+                    </div>
+                    <small v-if="globalSearchResultCount !== null" class="text-muted">
+                        {{ $t("Found {0} monitors", [globalSearchResultCount]) }}
+                    </small>
                 </div>
             </div>
         </div>
@@ -104,20 +90,10 @@
 
                 <!-- Sort Buttons 与 搜索框 放在同一行 -->
                 <div v-if="!editMode && group.element && group.element.monitorList && group.element.monitorList.length > 0" 
-                    class="sort-controls-container mb-3"
-                    :class="{
-                        'global-active': isGlobalSortActive && !group.element.useOwnSort,
-                        'local-active': isGlobalSortActive && group.element.useOwnSort
-                    }">
+                    class="sort-controls-container mb-3">
                     <div class="sort-controls">
                         <span class="sort-label me-2">
                             {{ $t("Sort By") }}:
-<!--                            <span v-if="isGlobalSortActive && !group.element.useOwnSort" class="small text-primary ms-1" title="全局排序已启用">-->
-<!--                                ({{ $t("Global") }})-->
-<!--                            </span>-->
-<!--                            <span v-if="isGlobalSortActive && group.element.useOwnSort" class="small text-success ms-1" title="此组使用独立排序">-->
-<!--                                ({{ $t("Custom") }})-->
-<!--                            </span>-->
                         </span>
                         <button
                             class="btn btn-sm sort-button"
@@ -1237,8 +1213,8 @@ export default {
 }
 
 .global-search-container {
-    max-width: 600px;
-    margin: 0 auto 1rem auto;
+    max-width: 300px;
+    margin-left: auto; /* 推到右侧 */
     
     .input-group {
         position: relative;
@@ -1252,8 +1228,9 @@ export default {
     
     small {
         display: block;
-        text-align: center;
+        text-align: right;
         margin-top: 0.25rem;
+        font-size: 0.75rem;
     }
 }
 
@@ -1267,11 +1244,13 @@ export default {
         background-color: #ffffff;
         border: 1px solid #e0e6ed;
         margin-top: 0.5rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
     }
     
     .sort-controls {
         display: flex;
-        justify-content: center;
         align-items: center;
         flex-wrap: wrap;
     }
