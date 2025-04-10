@@ -1,14 +1,15 @@
 <template>
     <!-- Group List -->
     <div v-if="hasPublicGroups && !editMode" class="global-controls-container">
-        <!-- 全局排序标题 -->
-        <h5 class="text-center mb-3">{{ $t("Global Sorting Options") }}</h5>
+        <!-- 全局控件标题 -->
+        <h5 class="global-controls-title">{{ $t("Global Sorting Options") }}</h5>
         
-        <!-- 全局排序栏和搜索框 -->
-        <div class="global-sort-container mb-4">
-            <div class="sort-controls-container global-sort-bar">
-                <div class="sort-controls">
-                    <span class="sort-label me-2">{{ $t("Sort All Groups By") }}:</span>
+        <!-- 全局排序栏与搜索框 -->
+        <div class="global-controls-content">
+            <!-- 全局排序按钮组 -->
+            <div class="global-sort-controls">
+                <span class="sort-label me-2">{{ $t("Sort By") }}:</span>
+                <div class="sort-buttons">
                     <button
                         class="btn btn-sm sort-button"
                         :class="{'active': globalSortKey === 'status' && isGlobalSortActive && !hasAnyGroupWithIndependentSort}"
@@ -43,31 +44,31 @@
                         <font-awesome-icon v-if="globalSortKey === 'cert' && isGlobalSortActive" :icon="globalSortDirection === 'asc' ? 'arrow-up' : 'arrow-down'" />
                     </button>
                 </div>
-                
-                <!-- 全局搜索框 -->
-                <div class="global-search-container">
-                    <div class="input-group">
-                        <input 
-                            type="text" 
-                            class="form-control form-control-sm" 
-                            v-model="globalSearchKeyword" 
-                            :placeholder="$t('Search across all monitors...')" 
-                            aria-label="Global search"
-                        >
-                        <button 
-                            v-if="globalSearchKeyword" 
-                            class="btn btn-outline-secondary btn-sm" 
-                            type="button" 
-                            @click="clearGlobalSearch"
-                            title="Clear search"
-                        >
-                            <font-awesome-icon icon="times" />
-                        </button>
-                    </div>
-                    <small v-if="globalSearchResultCount !== null" class="text-muted">
-                        {{ $t("Found {0} monitors", [globalSearchResultCount]) }}
-                    </small>
+            </div>
+            
+            <!-- 全局搜索框 -->
+            <div class="global-search-container">
+                <div class="input-group">
+                    <input 
+                        type="text" 
+                        class="form-control form-control-sm" 
+                        v-model="globalSearchKeyword" 
+                        :placeholder="$t('Search monitors across all groups')" 
+                        aria-label="Global search"
+                    >
+                    <button 
+                        v-if="globalSearchKeyword" 
+                        class="btn btn-outline-secondary btn-sm" 
+                        type="button" 
+                        @click="clearGlobalSearch"
+                        title="Clear search"
+                    >
+                        <font-awesome-icon icon="times" />
+                    </button>
                 </div>
+                <small v-if="globalSearchResultCount !== null" class="text-muted">
+                    {{ $t("Found {0} monitors", [globalSearchResultCount]) }}
+                </small>
             </div>
         </div>
     </div>
@@ -80,118 +81,125 @@
         :animation="100"
     >
         <template #item="group">
-            <div v-if="group && group.element" class="mb-5" data-testid="group" v-show="shouldShowGroup(group.element)">
-                <!-- Group Title -->
+            <div v-if="group && group.element" class="mb-5 group-container" data-testid="group" v-show="shouldShowGroup(group.element)">
+                <!-- 组容器 -->
+                <div class="shadow-box">
+                    <!-- 组标题与搜索栏 -->
+                    <div class="group-header">
                 <h2 class="group-title">
                     <font-awesome-icon v-if="editMode && showGroupDrag" icon="arrows-alt-v" class="action drag me-3" />
                     <font-awesome-icon v-if="editMode" icon="times" class="action remove me-3" @click="removeGroup(group.index)" />
                     <Editable v-model="group.element.name" :contenteditable="editMode" tag="span" data-testid="group-name" />
                 </h2>
 
-                <!-- Sort Buttons 与 搜索框 放在同一行 -->
-                <div v-if="!editMode && group.element && group.element.monitorList && group.element.monitorList.length > 0" 
-                    class="sort-controls-container mb-3">
-                    <div class="sort-controls">
-                        <span class="sort-label me-2">
-                            {{ $t("Sort By") }}:
-                        </span>
-                        <button
-                            class="btn btn-sm sort-button"
-                            :class="{
-                                'active': (isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'status') || 
-                                         ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'status')
-                            }"
-                            @click="setSort(group.element, 'status')"
-                        >
-                            {{ $t("Status") }}
-                            <font-awesome-icon 
-                                v-if="(isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'status') || 
-                                      ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'status')" 
-                                :icon="(isGlobalSortActive && !group.element.useOwnSort ? globalSortDirection : group.element.sortDirection) === 'asc' ? 'arrow-up' : 'arrow-down'" 
-                            />
-                        </button>
-                        <button
-                            class="btn btn-sm sort-button"
-                            :class="{
-                                'active': (isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'name') || 
-                                         ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'name')
-                            }"
-                            @click="setSort(group.element, 'name')"
-                        >
-                            {{ $t("Name") }}
-                            <font-awesome-icon 
-                                v-if="(isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'name') || 
-                                      ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'name')" 
-                                :icon="(isGlobalSortActive && !group.element.useOwnSort ? globalSortDirection : group.element.sortDirection) === 'asc' ? 'arrow-up' : 'arrow-down'" 
-                            />
-                        </button>
-                        <button
-                            class="btn btn-sm sort-button"
-                            :class="{
-                                'active': (isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'uptime') || 
-                                         ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'uptime')
-                            }"
-                            @click="setSort(group.element, 'uptime')"
-                        >
-                            {{ $t("Uptime") }}
-                            <font-awesome-icon 
-                                v-if="(isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'uptime') || 
-                                      ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'uptime')" 
-                                :icon="(isGlobalSortActive && !group.element.useOwnSort ? globalSortDirection : group.element.sortDirection) === 'asc' ? 'arrow-up' : 'arrow-down'" 
-                            />
-                        </button>
-                        <button
-                            v-if="showCertificateExpiry"
-                            class="btn btn-sm sort-button"
-                            :class="{
-                                'active': (isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'cert') || 
-                                         ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'cert')
-                            }"
-                            @click="setSort(group.element, 'cert')"
-                        >
-                            {{ $t("Cert Exp.") }}
-                            <font-awesome-icon 
-                                v-if="(isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'cert') || 
-                                      ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'cert')" 
-                                :icon="(isGlobalSortActive && !group.element.useOwnSort ? globalSortDirection : group.element.sortDirection) === 'asc' ? 'arrow-up' : 'arrow-down'" 
-                            />
-                        </button>
-                    </div>
-                    
-                    <!-- 组内搜索框 -->
-                    <div v-if="group.element && group.element.monitorList" class="search-container">
-                        <div class="search-input-wrapper">
-                            <input 
-                                type="text" 
-                                v-model="group.element.searchKeyword" 
-                                :placeholder="$t('Search...')" 
-                                class="search-input form-control form-control-sm"
-                                @keyup.esc="clearSearch(group.element)"
-                            >
-                            <button 
-                                class="search-button btn btn-sm"
-                                @click="clearSearch(group.element)"
-                                v-if="group.element && group.element.searchKeyword"
-                                title="清除搜索"
-                            >
-                                <font-awesome-icon icon="times" />
-                            </button>
+                        <!-- 组内搜索框 -->
+                        <div v-if="!editMode && group.element && group.element.monitorList && group.element.monitorList.length > 0" 
+                            class="search-container">
+                            <div class="search-input-wrapper">
+                                <input 
+                                    type="text" 
+                                    v-model="group.element.searchKeyword" 
+                                    :placeholder="$t('Search...')" 
+                                    class="search-input form-control form-control-sm"
+                                    @keyup.esc="clearSearch(group.element)"
+                                >
+                                <button 
+                                    class="search-button btn btn-sm"
+                                    @click="clearSearch(group.element)"
+                                    v-if="group.element && group.element.searchKeyword"
+                                    title="清除搜索"
+                                >
+                                    <font-awesome-icon icon="times" />
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <div class="shadow-box monitor-list mt-4 position-relative">
-                    <div v-if="!group.element || !group.element.monitorList || group.element.monitorList.length === 0" class="text-center no-monitor-msg">
-                        {{ $t("No Monitors") }}
+                    <!-- 组内排序按钮栏 -->
+                    <div v-if="!editMode && group.element && group.element.monitorList && group.element.monitorList.length > 0" 
+                        class="sort-bar">
+                        <div class="sort-controls">
+                            <span class="sort-label me-2">
+                                {{ $t("Sort By") }}:
+                            </span>
+                            <div class="sort-buttons">
+                                <button
+                                    class="sort-button"
+                                    :class="{
+                                        'active': (isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'status') || 
+                                                ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'status')
+                                    }"
+                                    @click="setSort(group.element, 'status')"
+                                >
+                                    {{ $t("Status") }}
+                                    <font-awesome-icon 
+                                        v-if="(isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'status') || 
+                                            ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'status')" 
+                                        :icon="(isGlobalSortActive && !group.element.useOwnSort ? globalSortDirection : group.element.sortDirection) === 'asc' ? 'arrow-up' : 'arrow-down'" 
+                                    />
+                                </button>
+                                <button
+                                    class="sort-button"
+                                    :class="{
+                                        'active': (isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'name') || 
+                                                ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'name')
+                                    }"
+                                    @click="setSort(group.element, 'name')"
+                                >
+                                    {{ $t("Name") }}
+                                    <font-awesome-icon 
+                                        v-if="(isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'name') || 
+                                            ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'name')" 
+                                        :icon="(isGlobalSortActive && !group.element.useOwnSort ? globalSortDirection : group.element.sortDirection) === 'asc' ? 'arrow-up' : 'arrow-down'" 
+                                    />
+                                </button>
+                                <button
+                                    class="sort-button"
+                                    :class="{
+                                        'active': (isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'uptime') || 
+                                                ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'uptime')
+                                    }"
+                                    @click="setSort(group.element, 'uptime')"
+                                >
+                                    {{ $t("Uptime") }}
+                                    <font-awesome-icon 
+                                        v-if="(isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'uptime') || 
+                                            ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'uptime')" 
+                                        :icon="(isGlobalSortActive && !group.element.useOwnSort ? globalSortDirection : group.element.sortDirection) === 'asc' ? 'arrow-up' : 'arrow-down'" 
+                                    />
+                                </button>
+                                <button
+                                    v-if="showCertificateExpiry"
+                                    class="sort-button"
+                                    :class="{
+                                        'active': (isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'cert') || 
+                                                ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'cert')
+                                    }"
+                                    @click="setSort(group.element, 'cert')"
+                                >
+                                    {{ $t("Cert Exp.") }}
+                                    <font-awesome-icon 
+                                        v-if="(isGlobalSortActive && !group.element.useOwnSort && globalSortKey === 'cert') || 
+                                            ((isGlobalSortActive && group.element.useOwnSort || !isGlobalSortActive) && group.element.sortKey === 'cert')" 
+                                        :icon="(isGlobalSortActive && !group.element.useOwnSort ? globalSortDirection : group.element.sortDirection) === 'asc' ? 'arrow-up' : 'arrow-down'" 
+                                    />
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                    <div v-else-if="getFilteredMonitorList(group.element).length === 0" class="text-center no-monitor-msg">
-                        {{ $t("No services found") }}
+
+                    <!-- 监控列表 -->
+                    <div class="monitor-list-container">
+                        <div v-if="!group.element || !group.element.monitorList || group.element.monitorList.length === 0" class="text-center no-monitor-msg">
+                        {{ $t("No Monitors") }}
+                        </div>
+                        <div v-else-if="getFilteredMonitorList(group.element).length === 0" class="text-center no-monitor-msg">
+                            {{ $t("No services found") }}
                     </div>
 
                     <!-- Monitor List -->
-                    <!-- animation is not working, no idea why -->
                     <Draggable
-                        v-if="group.element && group.element.monitorList && group.element.monitorList.length > 0"
+                            v-if="group.element && group.element.monitorList && group.element.monitorList.length > 0"
                         v-model="group.element.monitorList"
                         class="monitor-list"
                         group="same-group"
@@ -199,26 +207,26 @@
                         :animation="100"
                         item-key="id"
                     >
-                        <template #item="{ element: monitor, index: monitorIndex }">
-                            <div v-if="shouldShowMonitor(monitor, group.element)" class="item" data-testid="monitor">
+                            <template #item="{ element: monitor, index: monitorIndex }">
+                                <div v-if="shouldShowMonitor(monitor, group.element)" class="item" data-testid="monitor">
                                 <div class="row">
                                     <div class="col-9 col-md-8 small-padding">
                                         <div class="info">
                                             <font-awesome-icon v-if="editMode" icon="arrows-alt-v" class="action drag me-3" />
-                                            <font-awesome-icon v-if="editMode" icon="times" class="action remove me-3" @click="removeMonitor(group.index, monitorIndex)" />
+                                                <font-awesome-icon v-if="editMode" icon="times" class="action remove me-3" @click="removeMonitor(group.index, monitorIndex)" />
 
-                                            <Uptime :monitor="monitor" type="24" :pill="true" />
+                                                <Uptime :monitor="monitor" type="24" :pill="true" />
                                             <a
                                                 v-if="showLink(monitor)"
-                                                :href="monitor.url"
+                                                    :href="monitor.url"
                                                 class="item-name"
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 data-testid="monitor-name"
                                             >
-                                                {{ monitor.name }}
+                                                    {{ monitor.name }}
                                             </a>
-                                            <p v-else class="item-name" data-testid="monitor-name"> {{ monitor.name }} </p>
+                                                <p v-else class="item-name" data-testid="monitor-name"> {{ monitor.name }} </p>
 
                                             <span
                                                 title="Setting"
@@ -227,26 +235,27 @@
                                                     v-if="editMode"
                                                     :class="{'link-active': true, 'btn-link': true}"
                                                     icon="cog" class="action me-3"
-                                                    @click="$refs.monitorSettingDialog.show(group.element, monitor)"
+                                                        @click="$refs.monitorSettingDialog.show(group.element, monitor)"
                                                 />
                                             </span>
                                         </div>
                                         <div class="extra-info">
-                                            <div v-if="showCertificateExpiry && monitor.certExpiryDaysRemaining">
+                                                <div v-if="showCertificateExpiry && monitor.certExpiryDaysRemaining">
                                                 <Tag :item="{name: $t('Cert Exp.'), value: formattedCertExpiryMessage(monitor), color: certExpiryColor(monitor)}" :size="'sm'" />
                                             </div>
                                             <div v-if="showTags">
-                                                <Tag v-for="tag in monitor.tags" :key="tag" :item="tag" :size="'sm'" data-testid="monitor-tag" />
-                                            </div>
+                                                    <Tag v-for="tag in monitor.tags" :key="tag" :item="tag" :size="'sm'" data-testid="monitor-tag" />
+                                                </div>
                                         </div>
                                     </div>
                                     <div :key="$root.userHeartbeatBar" class="col-3 col-md-4">
-                                        <HeartbeatBar size="mid" :monitor-id="monitor.id" />
+                                            <HeartbeatBar size="mid" :monitor-id="monitor.id" />
                                     </div>
                                 </div>
                             </div>
                         </template>
                     </Draggable>
+                    </div>
                 </div>
             </div>
         </template>
@@ -981,13 +990,28 @@ export default {
 <style lang="scss" scoped>
 @import "../assets/vars";
 
+.group-container {
+    margin-bottom: 2rem;
+}
+
+.group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #e9ecef;
+}
+
 .group-title {
     display: flex;
     align-items: center;
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 500;
 }
 
 .search-container {
-    margin-left: auto; /* 推到右侧 */
+    margin-left: auto;
 }
 
 .search-input-wrapper {
@@ -996,10 +1020,12 @@ export default {
 }
 
 .search-input {
-    padding-right: 35px; /* 为清除按钮留出空间 */
-    max-width: 200px;
+    padding-right: 35px;
+    width: 200px;
     font-size: 0.85rem;
     border: 1px solid #dee2e6;
+    border-radius: 4px;
+    background-color: #fff;
 }
 
 .search-button {
@@ -1018,123 +1044,89 @@ export default {
     color: #495057;
 }
 
-.dark {
-    .search-input {
-        background-color: lighten($dark-bg, 5%);
-        border-color: $dark-border-color;
-        color: $dark-font-color;
-    }
-    
-    .search-button {
-        color: $dark-font-color;
-    }
-    
-    .search-button:hover {
-        color: white;
-    }
-}
-
-.sort-controls-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 0.5rem;
-    border-bottom: 1px solid #f0f0f0;
-    padding-bottom: 0.5rem;
-    
-    &.global-active {
-        background-color: rgba(13, 110, 253, 0.05);
-        border-radius: 4px;
-        padding: 0.5rem;
-        border: 1px dashed rgba(13, 110, 253, 0.3);
-    }
-    
-    &.local-active {
-        background-color: rgba(25, 135, 84, 0.05);
-        border-radius: 4px;
-        padding: 0.5rem;
-        border: 1px dashed rgba(25, 135, 84, 0.3);
-    }
+.sort-bar {
+    padding: 0.5rem 0;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    margin-left: -1px;
+    margin-right: -1px;
+    width: calc(100% + 2px);
 }
 
 .sort-controls {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    flex-wrap: wrap; /* Allow wrapping on smaller screens */
-    font-size: 0.85rem; /* Smaller font for sort controls */
+    padding: 0 1.25rem;
 }
 
 .sort-label {
     white-space: nowrap;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0;
     font-weight: 500;
     color: #6c757d;
 }
 
+.sort-buttons {
+    display: flex;
+    flex-wrap: wrap;
+}
+
 .sort-button {
-    padding: 0.2rem 0.5rem;
+    padding: 0.25rem 0.75rem;
     margin-left: 0.25rem;
-    margin-bottom: 0.25rem; /* 为换行提供更好的间距 */
-    background-color: transparent;
+    margin-bottom: 0;
+    background-color: #fff;
     border: 1px solid #dee2e6;
-    color: #6c757d;
-    transition: background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, color 0.15s ease-in-out;
-    white-space: nowrap; /* 防止按钮文字换行 */
-    font-size: 0.75rem; /* 略微减小字体大小 */
+    color: #495057;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    font-size: 0.8rem;
+    border-radius: 4px;
 
     &:hover {
         background-color: #e9ecef;
-        border-color: #adb5bd;
-        color: #495057;
+        border-color: #ced4da;
     }
 
     &.active {
-        background-color: $primary;
-        border-color: $primary;
+        background-color: #28a745;
+        border-color: #28a745;
         color: white;
     }
 
     .fa-arrow-up,
     .fa-arrow-down {
         margin-left: 0.3em;
+        font-size: 0.75rem;
     }
 }
 
-.dark {
-    .sort-controls-container {
-        border-bottom: 1px solid $dark-border-color;
-        padding-bottom: 0.5rem;
+.monitor-list-container {
+    position: relative;
+}
+
+.monitor-list {
+    min-height: 46px;
+    
+    .item {
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid #f0f0f0;
         
-        &.global-active {
-            background-color: rgba(59, 130, 246, 0.1);
-            border: 1px dashed rgba(59, 130, 246, 0.3);
-        }
-        
-        &.local-active {
-            background-color: rgba(16, 185, 129, 0.1);
-            border: 1px dashed rgba(16, 185, 129, 0.3);
+        &:last-child {
+            border-bottom: none;
         }
     }
-    
-    .sort-label {
-        color: $dark-font-color;
-    }
-    
-    .sort-button {
-        border-color: $dark-border-color;
-        color: $dark-font-color;
+}
 
-        &:hover {
-             background-color: lighten($dark-bg, 5%);
-             border-color: lighten($dark-border-color, 10%);
-             color: lighten($dark-font-color, 10%);
-        }
-
-        &.active {
-            background-color: $primary;
-            border-color: $primary;
-            color: white;
-        }
+.shadow-box {
+    border-radius: 6px;
+    overflow: hidden;
+    background-color: #fff;
+    border: 1px solid #e9ecef;
+    
+    .dark & {
+        background-color: #2d3748;
+        border-color: #4a5568;
     }
 }
 
@@ -1152,10 +1144,6 @@ export default {
     width: 100%;
     top: 20px;
     left: 0;
-}
-
-.monitor-list {
-    min-height: 46px;
 }
 
 .item-name {
@@ -1202,63 +1190,113 @@ export default {
 }
 
 .global-controls-container {
-    width: 100%;
-    max-width: none;
-    margin: 0 0 2rem 0;
     padding: 1rem;
-    background-color: #f0f4f8;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e0e6ed;
+    background-color: #fff;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    margin-bottom: 2rem;
+    overflow: hidden;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.global-controls-title {
+    text-align: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e9ecef;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: #495057;
+}
+
+.global-controls-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 0.5rem; /* Slightly reduce padding for content */
+}
+
+.global-sort-controls {
+    display: flex;
+    align-items: center;
+
+    .sort-label {
+        white-space: nowrap;
+        font-weight: 500;
+        color: #6c757d;
+        margin-right: 0.5rem;
+        padding: 0.25rem 0.5rem; /* Add padding to label */
+        border: 1px solid transparent; /* Match button border for alignment */
+        border-radius: 4px; /* Match button radius */
+    }
+
+    .sort-buttons {
+        display: flex;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        overflow: hidden;
+
+        .sort-button {
+            padding: 0.25rem 0.75rem;
+            border-radius: 0;
+            border: none;
+            border-right: 1px solid #dee2e6;
+            background-color: #fff;
+            color: #495057;
+            font-size: 0.8rem;
+            transition: background-color 0.15s ease-in-out;
+
+            &:last-child {
+                border-right: none;
+            }
+
+            &:hover {
+                background-color: #e9ecef;
+            }
+
+            &.active {
+                background-color: #28a745;
+                color: white;
+            }
+
+            .fa-arrow-up,
+            .fa-arrow-down {
+                margin-left: 0.3em;
+                font-size: 0.75rem;
+            }
+        }
+    }
 }
 
 .global-search-container {
-    max-width: 300px;
-    margin-left: auto; /* 推到右侧 */
-    
+    margin-left: 1rem; /* Space between sort and search */
+    flex-grow: 1; /* Allow search to take remaining space */
+    max-width: 400px; /* Limit max width */
+
     .input-group {
         position: relative;
         
+        .form-control {
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            background-color: #fff;
+        }
+        
         .btn {
-            border-top-right-radius: 4px;
-            border-bottom-right-radius: 4px;
+            position: absolute;
+            right: 1px; /* Position inside the input border */
+            top: 1px;
+            bottom: 1px;
+            border-radius: 0 4px 4px 0;
             z-index: 3;
+            background-color: transparent;
+            border: none;
+            padding: 0 0.75rem;
         }
     }
     
     small {
-        display: block;
-        text-align: right;
-        margin-top: 0.25rem;
-        font-size: 0.75rem;
-    }
-}
-
-.global-sort-container {
-    max-width: 100%;
-    margin: 0 auto;
-    
-    .sort-controls-container {
-        border-radius: 0.25rem;
-        padding: 0.75rem;
-        background-color: #ffffff;
-        border: 1px solid #e0e6ed;
-        margin-top: 0.5rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-    }
-    
-    .sort-controls {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-    }
-    
-    .sort-label {
-        font-weight: 600;
-        color: #495057;
-        margin-right: 0.5rem;
+        display: none; /* Hide the 'Found X monitors' text */
     }
 }
 
@@ -1266,35 +1304,86 @@ export default {
     .global-controls-container {
         background-color: #2d3748;
         border-color: #4a5568;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     }
-    
-    .global-sort-container {
-        .sort-controls-container {
-            background-color: #1a202c;
-            border-color: #4a5568;
+
+    .global-controls-title {
+        border-bottom-color: #4a5568;
+        color: #e2e8f0;
+    }
+
+    .global-sort-controls {
+        .sort-label {
+            color: $dark-font-color;
+            border-color: transparent;
         }
         
-        .sort-label {
-            color: #e2e8f0;
+        .sort-buttons {
+            border-color: #4a5568;
+            
+            .sort-button {
+                background-color: #1a202c;
+                border-right-color: #4a5568;
+                color: #e2e8f0;
+                
+                &:hover {
+                    background-color: #4a5568;
+                }
+                
+                &.active {
+                    background-color: #28a745;
+                    color: white;
+                }
+            }
+        }
+    }
+
+    .global-search-container {
+        .form-control {
+            background-color: #1a202c;
+            border-color: #4a5568;
+            color: $dark-font-color;
+        }
+        
+        .btn {
+            color: $dark-font-color;
+            
+            &:hover {
+                color: white;
+            }
         }
     }
 }
 
 @media (max-width: 768px) {
-    .sort-controls-container {
+    .group-header {
         flex-direction: column;
         align-items: flex-start;
     }
-
+    
     .search-container {
         margin-left: 0;
         margin-top: 0.5rem;
         width: 100%;
     }
-
+    
     .search-input {
-        max-width: 100%;
+        width: 100%;
+    }
+    
+    .sort-controls {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .sort-buttons {
+        margin-top: 0.5rem;
+    }
+    
+    .sort-button {
+        margin-bottom: 0.5rem;
     }
 }
 
 </style>
+
