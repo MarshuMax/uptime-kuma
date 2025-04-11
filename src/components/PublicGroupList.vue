@@ -1,12 +1,12 @@
 <template>
     <!-- Group List -->
     <div v-if="hasPublicGroups && !editMode" class="global-controls-container">
-        <!-- 全局控件标题 -->
+        <!-- Global Controls Title -->
         <h5 class="global-controls-title">{{ $t("Global Sorting Options") }}</h5>
         
-        <!-- 全局排序栏与搜索框 -->
+        <!-- Global Sorting Bar and Search Box -->
         <div class="global-controls-content">
-            <!-- 全局排序按钮组 -->
+            <!-- Global Sort Buttons Group -->
             <div class="global-sort-controls">
                 <span class="sort-label me-2">{{ $t("Sort By") }}:</span>
                 <div class="sort-buttons">
@@ -46,7 +46,7 @@
                 </div>
             </div>
             
-            <!-- 全局搜索框 -->
+            <!-- Global Search Box -->
             <div class="global-search-container">
                 <div class="input-group">
                     <input 
@@ -82,9 +82,9 @@
     >
         <template #item="group">
             <div v-if="group && group.element" class="mb-5 group-container" data-testid="group" v-show="shouldShowGroup(group.element)">
-                <!-- 组容器 -->
+                <!-- Group Container -->
                 <div class="shadow-box">
-                    <!-- 组标题与搜索栏 -->
+                    <!-- Group Title and Search Bar -->
                     <div class="group-header">
                 <h2 class="group-title">
                     <font-awesome-icon v-if="editMode && showGroupDrag" icon="arrows-alt-v" class="action drag me-3" />
@@ -92,7 +92,7 @@
                     <Editable v-model="group.element.name" :contenteditable="editMode" tag="span" data-testid="group-name" />
                 </h2>
 
-                        <!-- 组内搜索框 -->
+                        <!-- Group Search Box -->
                         <div v-if="!editMode && group.element && group.element.monitorList && group.element.monitorList.length > 0" 
                             class="search-container">
                             <div class="search-input-wrapper">
@@ -107,7 +107,7 @@
                                     class="search-button btn btn-sm"
                                     @click="clearSearch(group.element)"
                                     v-if="group.element && group.element.searchKeyword"
-                                    title="清除搜索"
+                                    title="Clear search"
                                 >
                                     <font-awesome-icon icon="times" />
                                 </button>
@@ -115,7 +115,7 @@
                         </div>
                     </div>
 
-                    <!-- 组内排序按钮栏 -->
+                    <!-- Group Sort Button Bar -->
                     <div v-if="!editMode && group.element && group.element.monitorList && group.element.monitorList.length > 0" 
                         class="sort-bar">
                         <div class="sort-controls">
@@ -188,7 +188,7 @@
                         </div>
                     </div>
 
-                    <!-- 监控列表 -->
+                    <!-- Monitor List -->
                     <div class="monitor-list-container">
                         <div v-if="!group.element || !group.element.monitorList || group.element.monitorList.length === 0" class="text-center no-monitor-msg">
                         {{ $t("No Monitors") }}
@@ -402,7 +402,7 @@ export default {
             },
             deep: true,
         },
-        // 监听全局排序变化
+        // Watch for changes in global sort
         globalSortKey: {
             handler() {
                 this.applyGlobalSort();
@@ -415,10 +415,10 @@ export default {
         }
     },
     created() {
-        // 从 localStorage 获取排序设置的方法
+        // Method to get saved sort settings from localStorage
         const getSavedSortSettings = (group) => {
             try {
-                const groupId = group.id || group.name || '默认分组';
+                const groupId = group.id || group.name || 'Default Group';
                 const storageKey = `uptime-kuma-sort-${this.slug}-${groupId}`;
                 
                 const savedSettings = localStorage.getItem(storageKey);
@@ -430,12 +430,12 @@ export default {
                     };
                 }
             } catch (error) {
-                console.error('无法读取排序设置', error);
+                console.error('Cannot read sort settings', error);
             }
             return null;
         };
 
-        // 尝试从 localStorage 中读取保存的全局排序设置
+        // Try to read saved global sort settings from localStorage
         try {
             const storageKey = `uptime-kuma-global-sort-${this.slug}`;
             const savedGlobalSettings = localStorage.getItem(storageKey);
@@ -443,31 +443,31 @@ export default {
                 const settings = JSON.parse(savedGlobalSettings);
                 this.globalSortKey = settings.key;
                 this.globalSortDirection = settings.direction;
-                // 同时恢复全局排序激活状态
+                // Also restore global sort active state
                 this.isGlobalSortActive = settings.active === undefined ? false : settings.active;
             }
         } catch (error) {
-            console.error('无法读取全局排序设置', error);
+            console.error('Cannot read global sort settings', error);
         }
 
         // Initialize sort state and apply initial sort for existing groups
         if (this.$root.publicGroupList) {
             this.$root.publicGroupList.forEach(group => {
                 if (group) {
-                    // 初始化搜索关键词
+                    // Initialize search keywords
                     if (group.searchKeyword === undefined) {
                         group.searchKeyword = '';
                     }
                     
-                    // 尝试从 localStorage 中读取保存的排序设置
+                    // Try to read saved sort settings from localStorage
                     const savedSettings = getSavedSortSettings(group);
                     
                     if (savedSettings) {
-                        // 如果找到保存的设置，应用它
+                        // Apply saved settings if found
                         group.sortKey = savedSettings.key;
                         group.sortDirection = savedSettings.direction;
                     } else {
-                        // 否则使用默认设置
+                        // Use default settings otherwise
                         if (group.sortKey === undefined) {
                             group.sortKey = 'status';
                         }
@@ -482,7 +482,7 @@ export default {
             });
         }
 
-        // 初始化后应用全局排序
+        // Apply global sorting after initialization
         this.applyGlobalSort();
 
         // Watch for new groups being added and initialize their sort state
@@ -491,21 +491,21 @@ export default {
                 if (newGroups) {
                     newGroups.forEach(group => {
                         if (group) {
-                            // 确保每个组都有搜索关键词属性
+                            // Ensure each group has search keyword property
                             if (group.searchKeyword === undefined) {
                                 group.searchKeyword = '';
                             }
                             
                             if (group.sortKey === undefined) {
-                                // 尝试从 localStorage 中读取排序设置
+                                // Try to read sort settings from localStorage
                                 const savedSettings = getSavedSortSettings(group);
                                 
                                 if (savedSettings) {
-                                    // 如果找到保存的设置，应用它
+                                    // Apply saved settings if found
                                     group.sortKey = savedSettings.key;
                                     group.sortDirection = savedSettings.direction;
                                 } else {
-                                    // 否则使用默认设置
+                                    // Use default settings otherwise
                                     group.sortKey = 'status';
                                     group.sortDirection = 'desc';
                                 }
@@ -520,15 +520,15 @@ export default {
         }
     },
     unmounted() {
-        // 清理组件卸载时的引用，避免内存泄漏
-        // Vue 3 中 watcher 会在组件卸载时自动清理，不需要手动解除
+        // Clean up references when component is unmounted to avoid memory leaks
+        // In Vue 3, watchers are automatically cleaned up when component is unmounted
     },
     methods: {
         /**
-         * 判断监控项是否与搜索关键词匹配
-         * @param {object} monitor 监控项对象
-         * @param {string} keyword 搜索关键词
-         * @returns {boolean} 是否匹配
+         * Check if monitor matches search keyword
+         * @param {object} monitor Monitor object
+         * @param {string} keyword Search keyword
+         * @returns {boolean} Whether it matches
          */
         monitorMatchesSearch(monitor, keyword) {
             if (!keyword) return true;
@@ -536,16 +536,16 @@ export default {
             
             keyword = keyword.toLowerCase().trim();
             
-            // 搜索名称、URL和描述字段
+            // Search name, URL and description fields
             return (monitor.name && monitor.name.toLowerCase().includes(keyword)) || 
                    (monitor.url && monitor.url.toLowerCase().includes(keyword)) || 
                    (monitor.description && monitor.description.toLowerCase().includes(keyword));
         },
         
         /**
-         * 判断监控项是否符合全局搜索条件
-         * @param {object} monitor 监控项对象
-         * @returns {boolean} 是否匹配
+         * Check if monitor matches global search criteria
+         * @param {object} monitor Monitor object
+         * @returns {boolean} Whether it matches
          */
         matchesGlobalSearch(monitor) {
             if (!this.globalSearchKeyword) return true;
@@ -555,20 +555,20 @@ export default {
         },
         
         /**
-         * 判断监控项是否应该在界面上显示
-         * @param {object} monitor 监控项对象
-         * @param {object} group 分组对象
-         * @returns {boolean} 是否显示
+         * Determine if monitor should be displayed
+         * @param {object} monitor Monitor object
+         * @param {object} group Group object
+         * @returns {boolean} Whether to display
          */
         shouldShowMonitor(monitor, group) {
             if (!monitor) return false;
             
-            // 先检查全局搜索
+            // Check global search first
             if (this.globalSearchKeyword && !this.matchesGlobalSearch(monitor)) {
                 return false;
             }
             
-            // 再检查组内搜索
+            // Then check group search
             if (group && group.searchKeyword) {
                 return this.monitorMatchesSearch(monitor, group.searchKeyword);
             }
@@ -577,23 +577,23 @@ export default {
         },
         
         /**
-         * 获取过滤后的监控列表
-         * @param {object} group 分组对象
-         * @returns {array} 过滤后的监控列表
+         * Get filtered monitor list
+         * @param {object} group Group object
+         * @returns {array} Filtered monitor list
          */
         getFilteredMonitorList(group) {
             if (!group || !group.monitorList || !Array.isArray(group.monitorList)) return [];
             
-            let result = [...group.monitorList]; // 创建副本避免修改原数组
+            let result = [...group.monitorList]; // Create a copy to avoid modifying original array
             
-            // 先应用全局搜索
+            // Apply global search first
             if (this.globalSearchKeyword) {
                 result = result.filter(monitor => 
                     monitor && this.matchesGlobalSearch(monitor)
                 );
             }
             
-            // 再应用组内搜索
+            // Then apply group search
             if (group.searchKeyword) {
                 result = result.filter(monitor => 
                     monitor && this.monitorMatchesSearch(monitor, group.searchKeyword)
@@ -604,17 +604,17 @@ export default {
         },
         
         /**
-         * 判断是否应该显示分组
-         * @param {object} group 分组对象
-         * @returns {boolean} 是否应该显示
+         * Determine if group should be displayed
+         * @param {object} group Group object
+         * @returns {boolean} Whether to display
          */
         shouldShowGroup(group) {
             if (!group) return false;
             
-            // 编辑模式下总是显示
+            // Always show in edit mode
             if (this.editMode) return true;
             
-            // 如果有全局搜索，只显示包含匹配监控项的分组
+            // If there's global search, only show groups containing matching monitors
             if (this.globalSearchKeyword) {
                 return group.monitorList && group.monitorList.some(monitor => 
                     this.matchesGlobalSearch(monitor)
@@ -625,8 +625,8 @@ export default {
         },
         
         /**
-         * 清除组内搜索关键词
-         * @param {object} group 分组对象
+         * Clear group search keyword
+         * @param {object} group Group object
          */
         clearSearch(group) {
             if (group) {
@@ -635,7 +635,7 @@ export default {
         },
         
         /**
-         * 清除全局搜索关键词
+         * Clear global search keyword
          */
         clearGlobalSearch() {
             this.globalSearchKeyword = '';
@@ -647,7 +647,7 @@ export default {
          * @param {string} key The sort key ('status', 'name', 'uptime', 'cert')
          */
         setSort(group, key) {
-            // 即使全局排序激活，也只改变当前组的排序设置
+            // Change only the current group's sort settings even when global sort is active
             if (group.sortKey === key) {
                 group.sortDirection = group.sortDirection === 'asc' ? 'desc' : 'asc';
             } else {
@@ -655,52 +655,52 @@ export default {
                 group.sortDirection = (key === 'status') ? 'desc' : 'asc';
             }
             
-            // 保存排序设置到 localStorage
+            // Save sort settings to localStorage
             try {
-                // 获取分组的唯一标识，如果没有 id 则使用名称
-                const groupId = group.id || group.name || '默认分组';
+                // Get a unique identifier for the group, use name if id is not available
+                const groupId = group.id || group.name || 'Default Group';
                 const storageKey = `uptime-kuma-sort-${this.slug}-${groupId}`;
                 
-                // 保存排序设置
+                // Save sort settings
                 const sortSettings = {
                     key: group.sortKey,
                     direction: group.sortDirection
                 };
                 localStorage.setItem(storageKey, JSON.stringify(sortSettings));
             } catch (error) {
-                console.error('无法保存排序设置', error);
+                console.error('Cannot save sort settings', error);
             }
             
-            // 如果全局排序激活，我们需要暂时禁用全局排序来应用组的排序
+            // If global sort is active, we need to temporarily disable it to apply group's sort
             const wasGlobalSortActive = this.isGlobalSortActive;
             
-            // 暂时禁用全局排序
+            // Temporarily disable global sort
             if (wasGlobalSortActive) {
-                // 为当前组设置独立排序标志
+                // Set independent sort flag for current group
                 group.useOwnSort = true;
             }
             
-            // 应用排序到此组
+            // Apply sort to this group
             this.applySortToGroup(group);
         },
 
         /**
-         * 应用排序到特定组，考虑组独立排序设置
-         * @param {object} group 组对象
+         * Apply sort to specific group, considering independent sort settings
+         * @param {object} group Group object
          */
         applySortToGroup(group) {
             if (!group || !group.monitorList || !Array.isArray(group.monitorList)) {
                 return;
             }
             
-            // 检查组是否有独立排序设置
+            // Check if group has independent sort settings
             if (group.useOwnSort || !this.isGlobalSortActive) {
-                // 使用组自己的排序设置
+                // Use group's own sort settings
                 const sortKey = group.sortKey || 'status';
                 const sortDirection = group.sortDirection || 'desc';
                 this.sortMonitorList(group.monitorList, sortKey, sortDirection);
             } else {
-                // 使用全局排序设置
+                // Use global sort settings
                 this.sortMonitorList(group.monitorList, this.globalSortKey, this.globalSortDirection);
             }
         },
@@ -714,10 +714,10 @@ export default {
         },
 
         /**
-         * 对监控列表进行排序，不修改组的排序设置
-         * @param {array} monitorList 要排序的监控列表
-         * @param {string} sortKey 排序键
-         * @param {string} sortDirection 排序方向
+         * Sort monitor list without modifying group's sort settings
+         * @param {array} monitorList Monitor list to sort
+         * @param {string} sortKey Sort key
+         * @param {string} sortDirection Sort direction
          */
         sortMonitorList(monitorList, sortKey, sortDirection) {
             if (!Array.isArray(monitorList)) {
@@ -758,8 +758,8 @@ export default {
                     valueA = uptimeA;
                     valueB = uptimeB;
                 } else if (sortKey === 'cert') {
-                    // 按证书过期时间排序
-                    // 有效证书的监控器值为剩余天数，无效证书或没有证书的值为 -1
+                    // Sort by certificate expiry time
+                    // Valid certificates have remaining days, invalid or no certificates have -1
                     valueA = a.validCert && a.certExpiryDaysRemaining ? a.certExpiryDaysRemaining : -1;
                     valueB = b.validCert && b.certExpiryDaysRemaining ? b.certExpiryDaysRemaining : -1;
                 }
@@ -770,11 +770,11 @@ export default {
                     comparison = 1;
                 }
 
-                // 只在按状态排序时，才特殊处理宕机服务器的位置
+                // Special handling for status sorting only
                 if (sortKey === 'status') {
                     return sortDirection === 'desc' ? (comparison * -1) : comparison;
                 } else {
-                    // 使用纯粹的排序结果，不特殊处理宕机服务器
+                    // Use pure sort result, without special handling for down servers
                     return sortDirection === 'asc' ? comparison : (comparison * -1);
                 }
             });
@@ -845,10 +845,13 @@ export default {
             return "#DC2626";
         },
 
+        /**
+         * Toggle global sort state
+         */
         toggleGlobalSort() {
             this.isGlobalSortActive = !this.isGlobalSortActive;
             
-            // 当切换全局排序状态时，重置所有组的独立排序标志
+            // Reset all groups' independent sort flags when toggling global sort state
             if (this.$root && this.$root.publicGroupList) {
                 this.$root.publicGroupList.forEach(group => {
                     if (group) {
@@ -857,7 +860,7 @@ export default {
                 });
             }
             
-            // 保存设置
+            // Save settings
             try {
                 const storageKey = `uptime-kuma-global-sort-${this.slug}`;
                 const globalSortSettings = {
@@ -867,14 +870,14 @@ export default {
                 };
                 localStorage.setItem(storageKey, JSON.stringify(globalSortSettings));
             } catch (error) {
-                console.error('无法保存全局排序设置', error);
+                console.error('Cannot save global sort settings', error);
             }
             
-            // 根据全局排序状态应用适当的排序
+            // Apply appropriate sorting based on global sort state
             if (this.isGlobalSortActive) {
                 this.applyGlobalSort();
             } else {
-                // 恢复各组独立排序
+                // Restore independent sorting for each group
                 if (this.$root && this.$root.publicGroupList) {
                     this.$root.publicGroupList.forEach(group => {
                         if (group) {
@@ -890,7 +893,7 @@ export default {
          * @param {string} key The sort key ('status', 'name', 'uptime', 'cert')
          */
         setGlobalSort(key) {
-            // 更新全局排序设置
+            // Update global sort settings
             if (this.globalSortKey === key) {
                 this.globalSortDirection = this.globalSortDirection === 'asc' ? 'desc' : 'asc';
             } else {
@@ -898,10 +901,10 @@ export default {
                 this.globalSortDirection = (key === 'status') ? 'desc' : 'asc';
             }
             
-            // 激活全局排序
+            // Activate global sort
             this.isGlobalSortActive = true;
             
-            // 清除所有组的独立排序标志
+            // Clear all groups' independent sort flags
             if (this.$root && this.$root.publicGroupList) {
                 this.$root.publicGroupList.forEach(group => {
                     if (group) {
@@ -910,11 +913,11 @@ export default {
                 });
             }
             
-            // 保存全局排序设置到 localStorage
+            // Save global sort settings to localStorage
             try {
                 const storageKey = `uptime-kuma-global-sort-${this.slug}`;
                 
-                // 保存全局排序设置
+                // Save global sort settings
                 const globalSortSettings = {
                     key: this.globalSortKey,
                     direction: this.globalSortDirection,
@@ -922,20 +925,20 @@ export default {
                 };
                 localStorage.setItem(storageKey, JSON.stringify(globalSortSettings));
             } catch (error) {
-                console.error('无法保存全局排序设置', error);
+                console.error('Cannot save global sort settings', error);
             }
             
-            // 应用全局排序
+            // Apply global sort
             this.applyGlobalSort();
         },
 
         /**
-         * 禁用全局排序，恢复各组独立排序
+         * Disable global sort and restore independent sorting for each group
          */
         disableGlobalSort() {
             this.isGlobalSortActive = false;
             
-            // 清除所有组的独立排序标志
+            // Clear all groups' independent sort flags
             if (this.$root && this.$root.publicGroupList) {
                 this.$root.publicGroupList.forEach(group => {
                     if (group) {
@@ -944,7 +947,7 @@ export default {
                 });
             }
             
-            // 保存设置
+            // Save settings
             try {
                 const storageKey = `uptime-kuma-global-sort-${this.slug}`;
                 const globalSortSettings = {
@@ -954,10 +957,10 @@ export default {
                 };
                 localStorage.setItem(storageKey, JSON.stringify(globalSortSettings));
             } catch (error) {
-                console.error('无法保存全局排序设置', error);
+                console.error('Cannot save global sort settings', error);
             }
             
-            // 恢复各组的原始排序
+            // Restore original sorting for each group
             if (this.$root && this.$root.publicGroupList) {
                 this.$root.publicGroupList.forEach(group => {
                     if (group) {
@@ -975,10 +978,10 @@ export default {
                 return;
             }
             
-            // 应用全局排序设置到所有不使用独立排序的组
+            // Apply global sort settings to all groups not using independent sorting
             this.$root.publicGroupList.forEach(group => {
                 if (group && group.monitorList && !group.useOwnSort) {
-                    // 使用全局排序设置进行排序
+                    // Use global sort settings for sorting
                     this.sortMonitorList(group.monitorList, this.globalSortKey, this.globalSortDirection);
                 }
             });
